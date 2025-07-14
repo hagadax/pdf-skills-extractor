@@ -6,18 +6,8 @@
     <title>PDF Skills Extractor</title>
     <style>
         * {
-            margin: 0;        <!-- Chart Section -->
-        {% if chart_data.datasets %}
-        <div class="card chart-section" style="margin-bottom: 2rem;">
-            <h2>Skills Growth - Last 12 Months</h2>
-            <p style="color: #6c757d; margin-bottom: 1rem; font-size: 0.9rem;">
-                Cumulative skill counts showing growth over time based on document analysis
-            </p>
-            <div style="position: relative; height: 400px;">
-                <canvas id="skillsChart"></canvas>
-            </div>
-        </div>
-        {% endif %} padding: 0;
+            margin: 0;
+            padding: 0;
             box-sizing: border-box;
         }
         body {
@@ -25,6 +15,111 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             color: #333;
+        }
+        
+        /* Navigation Menu */
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 0;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2rem;
+        }
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .nav-menu {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+        }
+        .nav-item a {
+            text-decoration: none;
+            color: #333;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .nav-item a:hover {
+            background: #667eea;
+            color: white;
+        }
+        .nav-item a.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        /* Mobile Navigation */
+        .nav-toggle {
+            display: none;
+            flex-direction: column;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+        .nav-toggle span {
+            width: 25px;
+            height: 3px;
+            background: #333;
+            margin: 3px 0;
+            transition: 0.3s;
+        }
+        
+        /* Loading Modal */
+        .loading-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+        }
+        .loading-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 400px;
+            width: 90%;
+        }
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loading-text {
+            color: #333;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+        .loading-subtext {
+            color: #666;
+            font-size: 0.9rem;
         }
         .container {
             max-width: 1200px;
@@ -105,6 +200,11 @@
         }
         .btn-upload:hover {
             transform: translateY(-2px);
+        }
+        .btn-upload:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
         .stats-section h2 {
             color: #333;
@@ -194,6 +294,26 @@
             font-size: 1.5rem;
         }
         @media (max-width: 768px) {
+            .nav-menu {
+                position: fixed;
+                top: 70px;
+                left: -100%;
+                width: 100%;
+                height: calc(100vh - 70px);
+                background: white;
+                flex-direction: column;
+                justify-content: flex-start;
+                align-items: center;
+                transition: left 0.3s ease;
+                padding-top: 2rem;
+                gap: 1rem;
+            }
+            .nav-menu.active {
+                left: 0;
+            }
+            .nav-toggle {
+                display: flex;
+            }
             .main-content {
                 grid-template-columns: 1fr;
             }
@@ -210,20 +330,39 @@
     </style>
 </head>
 <body>
+    <!-- Navigation Menu -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">PDF Skills Extractor</div>
+            <ul class="nav-menu">
+                <li class="nav-item"><a href="/" class="active">Home</a></li>
+                <li class="nav-item"><a href="/skills">All Skills</a></li>
+                <li class="nav-item"><a href="/skill-details">Skills & Documents</a></li>
+                <li class="nav-item"><a href="/documents">Documents</a></li>
+                <li class="nav-item"><a href="/about">About</a></li>
+                <li class="nav-item"><a href="/api/skills">API</a></li>
+            </ul>
+            <div class="nav-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Loading Modal -->
+    <div class="loading-modal" id="loadingModal">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Processing PDF...</div>
+            <div class="loading-subtext">Extracting skills from your document</div>
+        </div>
+    </div>
+
     <div class="container">
         <div class="header">
             <h1>PDF Skills Extractor</h1>
             <p>Upload PDF documents to extract and track technology skills</p>
-        </div>
-
-        <!-- Navigation moved to top -->
-        <div class="navigation" style="margin-bottom: 2rem;">
-            <a href="/skills" class="nav-btn">View All Skills</a>
-            <a href="/skill-details" class="nav-btn">Skills & Documents</a>
-            <a href="/documents" class="nav-btn">All Documents</a>
-            <a href="/about" class="nav-btn">About</a>
-            <a href="/api/skills" class="nav-btn">API Endpoint</a>
-            <a href="/reset" class="nav-btn" onclick="return confirm('Are you sure you want to reset all statistics?')">Reset Stats</a>
         </div>
 
         {% with messages = get_flashed_messages() %}
@@ -252,15 +391,15 @@
         <div class="main-content">
             <div class="card upload-section">
                 <h2>Upload PDF Document</h2>
-                <form method="POST" action="/upload" enctype="multipart/form-data" class="upload-form">
+                <form id="uploadForm" enctype="multipart/form-data" class="upload-form">
                     <div class="file-input-wrapper">
-                        <input type="file" name="file" accept=".pdf" class="file-input" required>
+                        <input type="file" name="file" accept=".pdf" class="file-input" id="fileInput" required>
                         <div class="file-input-text">
                             <strong>Click to select a PDF file</strong><br>
                             <small>Maximum file size: 16MB</small>
                         </div>
                     </div>
-                    <button type="submit" class="btn-upload">Extract Skills</button>
+                    <button type="submit" class="btn-upload" id="uploadBtn">Extract Skills</button>
                 </form>
             </div>
 
@@ -304,12 +443,64 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <script>
+        // Mobile Navigation Toggle
+        const navToggle = document.querySelector('.nav-toggle');
+        const navMenu = document.querySelector('.nav-menu');
+
+        navToggle.addEventListener('click', () => {
+            navMenu.classList.toggle('active');
+        });
+
         // File input enhancement
-        document.querySelector('.file-input').addEventListener('change', function(e) {
+        const fileInput = document.getElementById('fileInput');
+        const textElement = document.querySelector('.file-input-text');
+        
+        fileInput.addEventListener('change', function(e) {
             const fileName = e.target.files[0]?.name;
-            const textElement = document.querySelector('.file-input-text');
             if (fileName) {
                 textElement.innerHTML = `<strong>Selected: ${fileName}</strong><br><small>Ready to upload</small>`;
+            }
+        });
+
+        // Form submission with loading modal
+        const uploadForm = document.getElementById('uploadForm');
+        const loadingModal = document.getElementById('loadingModal');
+        const uploadBtn = document.getElementById('uploadBtn');
+
+        uploadForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(uploadForm);
+            
+            // Show loading modal
+            loadingModal.style.display = 'flex';
+            uploadBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                // Hide loading modal
+                loadingModal.style.display = 'none';
+                uploadBtn.disabled = false;
+                
+                if (result.success) {
+                    // Show success message and reload page
+                    alert(result.message);
+                    window.location.reload();
+                } else {
+                    // Show error message
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                // Hide loading modal
+                loadingModal.style.display = 'none';
+                uploadBtn.disabled = false;
+                alert('Error uploading file: ' + error.message);
             }
         });
 

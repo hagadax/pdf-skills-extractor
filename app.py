@@ -5,14 +5,37 @@ import PyPDF2
 from werkzeug.utils import secure_filename
 from collections import defaultdict, Counter
 from datetime import datetime
+import io
+import tempfile
+from azure.storage.blob import BlobServiceClient
+from azure.identity import DefaultAzureCredential
 from skills import tech_skills
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-here'
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here')
+app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', 'uploads')
+app.config['MAX_CONTENT_LENGTH'] = int(os.environ.get('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))
 
-# Ensure upload directory exists
+# Azure Blob Storage configuration
+AZURE_STORAGE_CONNECTION_STRING = os.environ.get('AZURE_STORAGE_CONNECTION_STRING')
+AZURE_STORAGE_CONTAINER_NAME = os.environ.get('AZURE_STORAGE_CONTAINER_NAME', 'uploads')
+
+# Initialize Azure Blob Service Client with Managed Identity
+def get_blob_service_client():
+    """Initialize Azure Blob Service Client using Managed Identity or connection string."""
+    try:
+        if AZURE_STORAGE_CONNECTION_STRING:
+            return BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
+        else:
+            # Use Managed Identity for authentication
+            credential = DefaultAzureCredential()
+            account_url = f"https://{os.environ.get('AZURE_STORAGE_ACCOUNT_NAME')}.blob.core.windows.net"
+            return BlobServiceClient(account_url=account_url, credential=credential)
+    except Exception as e:
+        print(f"Error initializing blob service client: {e}")
+        return None
+
+# Ensure upload directory exists (fallback for local development)
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Global skill tracker
@@ -38,35 +61,47 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def extract_text_from_pdf(pdf_path):
-    """Extract text content from a PDF file."""
+def extract_text_from_pdf(file_content):
+    """Extract text content from a PDF file (from bytes or file path)."""
     try:
-        with open(pdf_path, 'rb') as file:
-            pdf_reader = PyPDF2.PdfReader(file)
-            text = ""
-            for page in pdf_reader.pages:
-                text += page.extract_text() + "\n"
+        if isinstance(file_content, str):
+            # Legacy support for file paths
+            with open(file_content, 'rb') as file:
+                pdf_reader = PyPDF2.PdfReader(file)
+        else:
+            # Handle bytes content from blob storage
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
+        
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text() + "\n"
         return text
     except Exception as e:
         print(f"Error extracting text from PDF: {e}")
         return ""
 
-def get_pdf_creation_date(pdf_path):
-    """Extract creation date from PDF metadata."""
+def get_pdf_creation_date(file_content):
+    """Extract creation date from PDF metadata (from bytes or file path)."""
     try:
-        with open(pdf_path, 'rb') as file:
-            pdf_reader = PyPDF2.PdfReader(file)
-            if pdf_reader.metadata:
-                creation_date = pdf_reader.metadata.get('/CreationDate')
-                if creation_date:
-                    # PDF dates are in format D:YYYYMMDDHHmmSSOHH'mm
-                    date_str = str(creation_date)
-                    if date_str.startswith('D:'):
-                        date_str = date_str[2:16]  # Extract YYYYMMDDHHMMSS
-                        try:
-                            return datetime.strptime(date_str[:8], '%Y%m%d').strftime('%Y-%m-%d')
-                        except:
-                            pass
+        if isinstance(file_content, str):
+            # Legacy support for file paths
+            with open(file_content, 'rb') as file:
+                pdf_reader = PyPDF2.PdfReader(file)
+        else:
+            # Handle bytes content from blob storage
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
+        
+        if pdf_reader.metadata and '/CreationDate' in pdf_reader.metadata:
+            creation_date = pdf_reader.metadata.get('/CreationDate')
+            if creation_date:
+                # PDF dates are in format D:YYYYMMDDHHmmSSOHH'mm
+                date_str = str(creation_date)
+                if date_str.startswith('D:'):
+                    date_str = date_str[2:16]  # Extract YYYYMMDDHHMMSS
+                    try:
+                        return datetime.strptime(date_str[:8], '%Y%m%d').strftime('%Y-%m-%d')
+                    except:
+                        pass
         return None
     except Exception as e:
         print(f"Error extracting PDF date: {e}")
@@ -161,66 +196,71 @@ def index():
 def upload_file():
     """Handle PDF file upload and skill extraction."""
     if 'file' not in request.files:
-        flash('No file selected')
-        return redirect(request.url)
+        return jsonify({'success': False, 'message': 'No file selected'})
     
     file = request.files['file']
     
     if file.filename == '':
-        flash('No file selected')
-        return redirect(url_for('index'))
+        return jsonify({'success': False, 'message': 'No file selected'})
     
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         
-        # Save the uploaded file
-        file.save(filepath)
-        
-        # Get upload date and file creation date
-        upload_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        file_date = get_pdf_creation_date(filepath)
-        
-        # Extract text from PDF
-        text = extract_text_from_pdf(filepath)
-        
-        if text:
-            # Extract skills from text (each skill only counted once per document)
-            found_skills = extract_skills(text)
+        try:
+            # Save file to Azure Blob Storage or local storage
+            file_content, is_blob = save_file_safely(file, filename)
             
-            # Get month key for tracking (use file date if available, otherwise upload date)
-            date_for_tracking = file_date if file_date else upload_date.split(' ')[0]
-            month_key = date_for_tracking[:7]  # Get YYYY-MM format
+            # Get upload date and file creation date
+            upload_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            file_date = get_pdf_creation_date(file_content)
             
-            # Update global skill counter (each unique skill from this document)
-            for skill in found_skills:
-                skill_counter[skill] += 1  # +1 per document, regardless of skill frequency in text
+            # Extract text from PDF
+            text = extract_text_from_pdf(file_content)
+            
+            if text:
+                # Extract skills from text (each skill only counted once per document)
+                found_skills = extract_skills(text)
                 
-                # Track monthly data
-                monthly_skill_data[skill][month_key] += 1
+                # Get month key for tracking (use file date if available, otherwise upload date)
+                date_for_tracking = file_date if file_date else upload_date.split(' ')[0]
+                month_key = date_for_tracking[:7]  # Get YYYY-MM format
                 
-                # Track which document contains this skill
-                skill_documents[skill].append({
-                    'filename': filename,
+                # Update global skill counter (each unique skill from this document)
+                for skill in found_skills:
+                    skill_counter[skill] += 1  # +1 per document, regardless of skill frequency in text
+                    
+                    # Track monthly data
+                    monthly_skill_data[skill][month_key] += 1
+                    
+                    # Track which document contains this skill
+                    skill_documents[skill].append({
+                        'filename': filename,
+                        'upload_date': upload_date,
+                        'file_date': file_date or upload_date.split(' ')[0]  # Use upload date if no file date
+                    })
+                
+                # Track processed document
+                processed_documents[filename] = {
                     'upload_date': upload_date,
-                    'file_date': file_date or upload_date.split(' ')[0]  # Use upload date if no file date
+                    'file_date': file_date or upload_date.split(' ')[0],
+                    'skills_found': found_skills,
+                    'storage_type': 'blob' if is_blob else 'local'
+                }
+                
+                storage_msg = 'Azure Blob Storage' if is_blob else 'local storage'
+                return jsonify({
+                    'success': True, 
+                    'message': f'Successfully processed {filename} (saved to {storage_msg}). Found {len(found_skills)} skills: {", ".join(found_skills)}',
+                    'skills': found_skills,
+                    'filename': filename
                 })
-            
-            # Track processed document
-            processed_documents[filename] = {
-                'upload_date': upload_date,
-                'file_date': file_date or upload_date.split(' ')[0],
-                'skills_found': found_skills
-            }
-            
-            flash(f'Successfully processed {filename}. Found {len(found_skills)} skills: {", ".join(found_skills)}')
-        else:
-            flash(f'Could not extract text from {filename}')
-        
-        return redirect(url_for('index'))
+            else:
+                return jsonify({'success': False, 'message': f'Could not extract text from {filename}'})
+                
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Error processing file: {str(e)}'})
     else:
-        flash('Please upload a PDF file')
-        return redirect(url_for('index'))
+        return jsonify({'success': False, 'message': 'Please upload a PDF file'})
 
 @app.route('/api/skills')
 def api_skills():
@@ -283,16 +323,75 @@ def about_page():
                          total_skill_occurrences=total_skill_occurrences,
                          total_categories=total_categories)
 
-@app.route('/reset')
-def reset_stats():
-    """Reset all skill statistics."""
-    global skill_counter, skill_documents, processed_documents, monthly_skill_data
-    skill_counter.clear()
-    skill_documents.clear()
-    processed_documents.clear()
-    monthly_skill_data.clear()
-    flash('Skill statistics have been reset')
-    return redirect(url_for('index'))
+# Azure Blob Storage helper functions
+def upload_file_to_blob(file_content, filename):
+    """Upload file to Azure Blob Storage."""
+    try:
+        blob_service_client = get_blob_service_client()
+        if not blob_service_client:
+            return False, "Azure Blob Storage not configured"
+        
+        blob_client = blob_service_client.get_blob_client(
+            container=AZURE_STORAGE_CONTAINER_NAME,
+            blob=filename
+        )
+        
+        blob_client.upload_blob(file_content, overwrite=True)
+        return True, "File uploaded successfully"
+    except Exception as e:
+        print(f"Error uploading to blob storage: {e}")
+        return False, f"Upload failed: {str(e)}"
+
+def download_file_from_blob(filename):
+    """Download file from Azure Blob Storage."""
+    try:
+        blob_service_client = get_blob_service_client()
+        if not blob_service_client:
+            return None
+        
+        blob_client = blob_service_client.get_blob_client(
+            container=AZURE_STORAGE_CONTAINER_NAME,
+            blob=filename
+        )
+        
+        return blob_client.download_blob().readall()
+    except Exception as e:
+        print(f"Error downloading from blob storage: {e}")
+        return None
+
+def save_file_safely(file, filename):
+    """Save file to Azure Blob Storage or local storage (fallback)."""
+    file_content = file.read()
+    
+    # Try Azure Blob Storage first
+    blob_service_client = get_blob_service_client()
+    if blob_service_client:
+        success, message = upload_file_to_blob(file_content, filename)
+        if success:
+            return file_content, True  # Return content and success flag
+    
+    # Fallback to local storage
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    with open(filepath, 'wb') as f:
+        f.write(file_content)
+    
+    return file_content, False  # Return content and blob flag (False = local)
+
+def get_file_content(filename, is_blob=True):
+    """Get file content from Azure Blob Storage or local storage."""
+    if is_blob:
+        content = download_file_from_blob(filename)
+        if content:
+            return content
+    
+    # Fallback to local storage
+    try:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        with open(filepath, 'rb') as f:
+            return f.read()
+    except Exception as e:
+        print(f"Error reading local file: {e}")
+        return None
 
 if __name__ == '__main__':
     app.run(debug=True)
