@@ -10,6 +10,7 @@ import tempfile
 from azure.storage.blob import BlobServiceClient
 from azure.identity import DefaultAzureCredential
 from skills import tech_skills
+import json
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here')
@@ -52,6 +53,101 @@ processed_documents = {}
 # Track monthly skill data for charts
 # Structure: {skill: {'2025-01': 5, '2025-02': 3, ...}}
 monthly_skill_data = defaultdict(lambda: defaultdict(int))
+
+# Stats persistence configuration
+STATS_BLOB_NAME = 'app_stats.json'
+STATS_CONTAINER_NAME = os.environ.get('AZURE_STORAGE_CONTAINER_NAME', 'uploads')
+
+def save_stats_to_blob():
+    """Save application statistics to Azure Blob Storage as JSON."""
+    try:
+        blob_service_client = get_blob_service_client()
+        if not blob_service_client:
+            print("Warning: Azure Blob Storage not available for stats persistence")
+            return False
+        
+        # Prepare stats data for serialization
+        stats_data = {
+            'skill_counter': dict(skill_counter),
+            'skill_documents': dict(skill_documents),
+            'processed_documents': processed_documents,
+            'monthly_skill_data': {
+                skill: dict(months) for skill, months in monthly_skill_data.items()
+            },
+            'last_updated': datetime.now().isoformat()
+        }
+        
+        # Convert to JSON
+        stats_json = json.dumps(stats_data, indent=2, default=str)
+        
+        # Upload to blob storage
+        blob_client = blob_service_client.get_blob_client(
+            container=STATS_CONTAINER_NAME,
+            blob=STATS_BLOB_NAME
+        )
+        
+        blob_client.upload_blob(stats_json, overwrite=True)
+        print("Stats saved to blob storage successfully")
+        return True
+        
+    except Exception as e:
+        print(f"Error saving stats to blob storage: {e}")
+        return False
+
+def load_stats_from_blob():
+    """Load application statistics from Azure Blob Storage."""
+    try:
+        blob_service_client = get_blob_service_client()
+        if not blob_service_client:
+            print("Info: Azure Blob Storage not available, starting with empty stats")
+            return False
+        
+        blob_client = blob_service_client.get_blob_client(
+            container=STATS_CONTAINER_NAME,
+            blob=STATS_BLOB_NAME
+        )
+        
+        # Check if stats file exists
+        if not blob_client.exists():
+            print("Info: No existing stats found, starting with empty stats")
+            return False
+        
+        # Download and parse stats
+        stats_content = blob_client.download_blob().readall()
+        stats_data = json.loads(stats_content.decode('utf-8'))
+        
+        # Restore global variables
+        global skill_counter, skill_documents, processed_documents, monthly_skill_data
+        
+        skill_counter = Counter(stats_data.get('skill_counter', {}))
+        
+        # Restore skill_documents (convert back to defaultdict)
+        skill_documents_data = stats_data.get('skill_documents', {})
+        skill_documents = defaultdict(list)
+        for skill, docs in skill_documents_data.items():
+            skill_documents[skill] = docs
+        
+        processed_documents = stats_data.get('processed_documents', {})
+        
+        # Restore monthly_skill_data (convert back to nested defaultdict)
+        monthly_data = stats_data.get('monthly_skill_data', {})
+        monthly_skill_data = defaultdict(lambda: defaultdict(int))
+        for skill, months in monthly_data.items():
+            monthly_skill_data[skill] = defaultdict(int, months)
+        
+        last_updated = stats_data.get('last_updated', 'Unknown')
+        print(f"Stats loaded from blob storage successfully (last updated: {last_updated})")
+        return True
+        
+    except Exception as e:
+        print(f"Error loading stats from blob storage: {e}")
+        return False
+
+# Load stats on application startup
+try:
+    load_stats_from_blob()
+except Exception as e:
+    print(f"Failed to load stats on startup: {e}")
 
 # Allowed file extensions
 ALLOWED_EXTENSIONS = {'pdf'}
@@ -247,6 +343,9 @@ def upload_file():
                     'storage_type': 'blob' if is_blob else 'local'
                 }
                 
+                # Save stats to blob storage after processing
+                save_stats_to_blob()
+                
                 storage_msg = 'Azure Blob Storage' if is_blob else 'local storage'
                 return jsonify({
                     'success': True, 
@@ -324,6 +423,75 @@ def about_page():
                          total_categories=total_categories)
 
 # Azure Blob Storage helper functions
+# Stats persistence functions
+def save_stats_to_blob():
+    """Save all statistics to Azure Blob Storage as JSON files."""
+    try:
+        blob_service_client = get_blob_service_client()
+        if not blob_service_client:
+            return False
+        
+        stats_data = {
+            'skill_counter': dict(skill_counter),
+            'skill_documents': dict(skill_documents),
+            'processed_documents': dict(processed_documents),
+            'monthly_skill_data': {k: dict(v) for k, v in monthly_skill_data.items()},
+            'last_updated': datetime.now().isoformat()
+        }
+        
+        # Upload stats as JSON
+        blob_client = blob_service_client.get_blob_client(
+            container=AZURE_STORAGE_CONTAINER_NAME,
+            blob='stats/app_statistics.json'
+        )
+        
+        blob_client.upload_blob(
+            json.dumps(stats_data, indent=2).encode('utf-8'),
+            overwrite=True
+        )
+        return True
+    except Exception as e:
+        print(f"Error saving stats to blob: {e}")
+        return False
+
+def load_stats_from_blob():
+    """Load statistics from Azure Blob Storage JSON files."""
+    try:
+        blob_service_client = get_blob_service_client()
+        if not blob_service_client:
+            return False
+        
+        blob_client = blob_service_client.get_blob_client(
+            container=AZURE_STORAGE_CONTAINER_NAME,
+            blob='stats/app_statistics.json'
+        )
+        
+        stats_json = blob_client.download_blob().readall().decode('utf-8')
+        stats_data = json.loads(stats_json)
+        
+        # Restore global variables
+        global skill_counter, skill_documents, processed_documents, monthly_skill_data
+        
+        skill_counter = Counter(stats_data.get('skill_counter', {}))
+        skill_documents = defaultdict(list, stats_data.get('skill_documents', {}))
+        processed_documents = stats_data.get('processed_documents', {})
+        monthly_skill_data = defaultdict(lambda: defaultdict(int))
+        
+        # Restore monthly data structure
+        for skill, months in stats_data.get('monthly_skill_data', {}).items():
+            for month, count in months.items():
+                monthly_skill_data[skill][month] = count
+        
+        print(f"Stats loaded successfully. Last updated: {stats_data.get('last_updated', 'Unknown')}")
+        return True
+    except Exception as e:
+        print(f"Error loading stats from blob: {e}")
+        return False
+
+# Load stats on application startup
+if __name__ != '__main__':  # Only load when running in production
+    load_stats_from_blob()
+
 def upload_file_to_blob(file_content, filename):
     """Upload file to Azure Blob Storage."""
     try:
