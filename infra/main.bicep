@@ -61,6 +61,8 @@ module appService 'core/host/appservice.bicep' = {
       APPINSIGHTS_INSTRUMENTATIONKEY: applicationInsights.outputs.instrumentationKey
       APPLICATIONINSIGHTS_CONNECTION_STRING: applicationInsights.outputs.connectionString
       ApplicationInsightsAgent_EXTENSION_VERSION: '~3'
+      AZURE_STORAGE_CONNECTION_STRING: storageAccount.outputs.connectionString
+      AZURE_STORAGE_CONTAINER_NAME: 'uploads'
     }
     keyVaultName: keyVault.outputs.name
     managedIdentity: managedIdentity.outputs.managedIdentityId
@@ -95,11 +97,23 @@ module applicationInsights 'core/monitor/applicationinsights.bicep' = {
   }
 }
 
+module storageAccount 'core/storage/storageaccount.bicep' = {
+  name: 'storageaccount'
+  params: {
+    name: 'st${resourceToken}'
+    location: location
+    tags: tags
+    managedIdentityPrincipalId: managedIdentity.outputs.managedIdentityPrincipalId
+  }
+}
+
 // Outputs
 output AZURE_LOCATION string = location
 output AZURE_TENANT_ID string = tenant().tenantId
 output AZURE_KEY_VAULT_ENDPOINT string = keyVault.outputs.uri
 output AZURE_KEY_VAULT_NAME string = keyVault.outputs.name
+output AZURE_STORAGE_ACCOUNT_NAME string = storageAccount.outputs.name
+output AZURE_STORAGE_CONNECTION_STRING string = storageAccount.outputs.connectionString
 output SERVICE_WEB_IDENTITY_PRINCIPAL_ID string = managedIdentity.outputs.managedIdentityPrincipalId
 output SERVICE_WEB_NAME string = appService.outputs.name
 output SERVICE_WEB_URI string = appService.outputs.uri
