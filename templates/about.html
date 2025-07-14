@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About - PDF Skills Extractor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            color: white;
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        .back-nav {
+            margin-bottom: 2rem;
+        }
+        .back-btn {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+        .back-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        .about-container {
+            background: white;
+            border-radius: 15px;
+            padding: 3rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            line-height: 1.6;
+        }
+        .about-title {
+            font-size: 2rem;
+            color: #333;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 1rem;
+        }
+        .about-content {
+            font-size: 1.1rem;
+            color: #555;
+            margin-bottom: 2rem;
+        }
+        .about-content p {
+            margin-bottom: 1.5rem;
+        }
+        .highlight-box {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-left: 4px solid #667eea;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 2rem 0;
+        }
+        .highlight-box h3 {
+            color: #667eea;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+        .highlight-box p {
+            margin-bottom: 0.5rem;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        .feature-card {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .feature-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+        .feature-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        .feature-description {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        .disclaimer {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+        .disclaimer h4 {
+            color: #856404;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+        .disclaimer p {
+            color: #856404;
+            margin-bottom: 0;
+            font-size: 0.95rem;
+        }
+        .tech-stats {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            text-align: center;
+            margin: 2rem 0;
+        }
+        .tech-stats h3 {
+            margin-bottom: 1rem;
+            font-size: 1.4rem;
+        }
+        .stats-row {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            display: block;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        @media (max-width: 768px) {
+            .about-container {
+                padding: 2rem;
+            }
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+            .stats-row {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>About PDF Skills Extractor</h1>
+            <p>Understanding technology trends through document analysis</p>
+        </div>
+
+        <div class="back-nav">
+            <a href="/" class="back-btn">← Back to Home</a>
+        </div>
+
+        <div class="about-container">
+            <h2 class="about-title">About This Application</h2>
+            
+            <div class="about-content">
+                <p>
+                    My name is Adiljan Abdurihim, Managing Consultant at Capgemini. I have created this application to help developers and businesses understand the current technology landscape by analyzing documents. The goal is to extract valuable insights about technology skills and trends that are relevant in today's market.
+                </p>
+                <p>
+                    This application was created with the use of AI to provide insight into the current market and demand for technological stacks. The primary goal is to give developers a better understanding of what technologies are relevant in today's market, enabling them to make strategic decisions for upskilling and career development.
+                </p>
+                
+                <p>
+                    By analyzing PDF documents such as job descriptions, resumes, project requirements, and technical specifications, this tool extracts and tracks technology skills mentioned across all uploaded documents. This creates a comprehensive overview of technology trends based on real-world documents.
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3>🎯 Purpose & Vision</h3>
+                <p><strong>Market Intelligence:</strong> Understand which technologies are currently in demand by analyzing real job postings, project requirements, and industry documents.</p>
+                <p><strong>Strategic Upskilling:</strong> Help developers identify skill gaps and prioritize learning paths based on market trends.</p>
+                <p><strong>Data-Driven Decisions:</strong> Make informed career and technology choices based on concrete data rather than assumptions.</p>
+            </div>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">📄</div>
+                    <div class="feature-title">Document Analysis</div>
+                    <div class="feature-description">Extract technology skills from PDF documents automatically</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <div class="feature-title">Trend Tracking</div>
+                    <div class="feature-description">Monitor skill frequency and popularity over time</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔍</div>
+                    <div class="feature-title">Smart Recognition</div>
+                    <div class="feature-description">Identify 200+ technologies across multiple categories</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📈</div>
+                    <div class="feature-title">Market Insights</div>
+                    <div class="feature-description">Understand technology demand and market trends</div>
+                </div>
+            </div>
+
+            <div class="tech-stats">
+                <h3>Technology Coverage</h3>
+                <div class="stats-row">
+                    <div class="stat-item">
+                        <span class="stat-number">{{ total_skills_in_db }}</span>
+                        <span class="stat-label">Technologies Tracked</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">{{ total_categories }}</span>
+                        <span class="stat-label">Categories Covered</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">{{ total_documents }}</span>
+                        <span class="stat-label">Documents Processed</span>
+                    </div>
+                </div>
+                
+                {% if unique_skills_found > 0 %}
+                <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.3);">
+                    <h4 style="margin-bottom: 1rem; font-size: 1.2rem;">Current Analysis Stats</h4>
+                    <div class="stats-row">
+                        <div class="stat-item">
+                            <span class="stat-number">{{ unique_skills_found }}</span>
+                            <span class="stat-label">Unique Skills Found</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">{{ total_skill_occurrences }}</span>
+                            <span class="stat-label">Total Skill Occurrences</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">{{ "%.1f"|format((unique_skills_found / total_skills_in_db * 100)) }}%</span>
+                            <span class="stat-label">Skills Database Coverage</span>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.3);">
+                    <p style="text-align: center; opacity: 0.9; font-style: italic;">
+                        Upload documents to see analysis statistics
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="highlight-box">
+                <h3>🔧 How It Works</h3>
+                <p><strong>1. Upload:</strong> Submit PDF documents containing technology-related content</p>
+                <p><strong>2. Extract:</strong> AI-powered text analysis identifies technology skills and tools</p>
+                <p><strong>3. Track:</strong> Skills are counted and tracked across all documents with metadata</p>
+                <p><strong>4. Analyze:</strong> View trends, relationships, and insights from your document collection</p>
+            </div>
+
+            <div class="disclaimer">
+                <h4>⚠️ Important Disclaimer</h4>
+                <p>
+                    This analysis is based solely on the documents that have been uploaded to the system and does not provide a complete or definitive image of the entire technology market. The insights should be used as a reference and starting point for further research. Market trends can vary significantly by region, industry, company size, and other factors not captured in this limited dataset.
+                </p>
+            </div>
+
+            <div class="about-content">
+                <p>
+                    <strong>Best Use Cases:</strong> This tool is most effective when analyzing collections of job postings, project requirements, industry reports, or technical documentation that represent your target market or area of interest.
+                </p>
+                
+                <p>
+                    <strong>Continuous Learning:</strong> As you upload more documents over time, the insights become more valuable and representative of trends in your specific field or target market.
+                </p>
+                <p>
+                    <strong>Developed:</strong> July 2025.
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

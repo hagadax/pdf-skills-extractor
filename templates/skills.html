@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Skills - PDF Skills Extractor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            color: white;
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        .back-nav {
+            margin-bottom: 2rem;
+        }
+        .back-btn {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+        .back-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        .skills-container {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        .skills-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .skills-title {
+            font-size: 1.8rem;
+            color: #333;
+        }
+        .total-count {
+            background: #667eea;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+        .skill-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1.5rem;
+            border-left: 4px solid #667eea;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .skill-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        .skill-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        .skill-count {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .skill-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        .no-skills {
+            text-align: center;
+            color: #6c757d;
+            font-size: 1.1rem;
+            margin: 3rem 0;
+        }
+        .search-box {
+            margin-bottom: 2rem;
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        @media (max-width: 768px) {
+            .skills-grid {
+                grid-template-columns: 1fr;
+            }
+            .skills-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>All Skills</h1>
+            <p>Complete list of extracted technology skills</p>
+        </div>
+
+        <div class="back-nav">
+            <a href="/" class="back-btn">← Back to Home</a>
+            <a href="/about" class="back-btn" style="margin-left: 1rem;">About</a>
+        </div>
+
+        <div class="skills-container">
+            <div class="skills-header">
+                <h2 class="skills-title">Technology Skills</h2>
+                <div class="total-count">{{ skills|length }} Total Skills</div>
+            </div>
+
+            {% if skills %}
+                <input type="text" id="searchBox" class="search-box" placeholder="Search skills..." onkeyup="filterSkills()">
+                
+                <div class="skills-grid" id="skillsGrid">
+                    {% for skill, count in skills %}
+                        <div class="skill-card" data-skill="{{ skill.lower() }}">
+                            <div class="skill-name">{{ skill }}</div>
+                            <div class="skill-count">{{ count }}</div>
+                            <div class="skill-label">occurrences</div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="no-skills">
+                    <h3>No skills found</h3>
+                    <p>Upload some PDF documents to start tracking skills!</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        function filterSkills() {
+            const searchTerm = document.getElementById('searchBox').value.toLowerCase();
+            const skillCards = document.querySelectorAll('.skill-card');
+            
+            skillCards.forEach(card => {
+                const skillName = card.getAttribute('data-skill');
+                if (skillName.includes(searchTerm)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
