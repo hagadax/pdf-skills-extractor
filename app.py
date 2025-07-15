@@ -170,7 +170,16 @@ def extract_text_from_pdf(file_content):
         
         text = ""
         for page in pdf_reader.pages:
-            text += page.extract_text() + "\n"
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+        
+        # Clean up common PDF extraction issues
+        # Remove excessive whitespace while preserving word boundaries
+        text = re.sub(r'\s+', ' ', text)  # Replace multiple spaces/newlines with single space
+        text = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)  # Add space between camelCase
+        text = text.strip()
+        
         return text
     except Exception as e:
         print(f"Error extracting text from PDF: {e}")
@@ -204,16 +213,87 @@ def get_pdf_creation_date(file_content):
         return None
 
 def extract_skills(text):
-    """Extract technology skills from text using case-insensitive matching.
-    Each skill is only counted once per document, regardless of how many times it appears."""
+    """Extract technology skills from text using improved pattern matching.
+    Handles PDF text fragmentation and skill variations."""
     found_skills = set()  # Use set to ensure uniqueness
-    text_lower = text.lower()
+    
+    # Normalize text: remove excessive whitespace and line breaks
+    normalized_text = ' '.join(text.split()).lower()
+    
+    # Also create a version without spaces for compound skills
+    no_spaces_text = re.sub(r'\s+', '', text.lower())
     
     for skill in tech_skills:
-        # Use word boundary regex to avoid partial matches
-        pattern = r'\b' + re.escape(skill.lower()) + r'\b'
-        if re.search(pattern, text_lower):
+        skill_lower = skill.lower()
+        skill_found = False
+        
+        # Method 1: Standard word boundary matching (for simple skills)
+        pattern = r'\b' + re.escape(skill_lower) + r'\b'
+        if re.search(pattern, normalized_text):
+            skill_found = True
+        
+        # Method 2: Flexible matching for compound skills (allows spaces/dots)
+        # Handle skills like "Node.js", "Vue.js", "C++", "C#", etc.
+        flexible_pattern = re.escape(skill_lower)
+        flexible_pattern = flexible_pattern.replace(r'\.', r'[\.\s]*')  # . or spaces
+        flexible_pattern = flexible_pattern.replace(r'\+', r'[\+\s]*')  # + or spaces  
+        flexible_pattern = flexible_pattern.replace(r'\#', r'[\#\s]*')  # # or spaces
+        flexible_pattern = flexible_pattern.replace(r'\s', r'\s*')      # flexible spaces
+        
+        if re.search(r'\b' + flexible_pattern + r'\b', normalized_text):
+            skill_found = True
+        
+        # Method 3: No-spaces matching for fragmented text
+        skill_no_spaces = re.sub(r'[\s\.\+\#-]', '', skill_lower)
+        if len(skill_no_spaces) > 2 and skill_no_spaces in no_spaces_text:
+            skill_found = True
+        
+        if skill_found:
             found_skills.add(skill)
+    
+    # Additional skill variations and aliases
+    skill_aliases = {
+        'js': 'JavaScript',
+        'ts': 'TypeScript', 
+        'nodejs': 'Node.js',
+        'reactjs': 'React',
+        'vuejs': 'Vue.js',
+        'nextjs': 'Next.js',
+        'nuxtjs': 'Nuxt.js',
+        'dotnet': 'ASP.NET',
+        '.net': 'ASP.NET',
+        'csharp': 'C#',
+        'cplusplus': 'C++',
+        'ai': 'Artificial Intelligence',
+        'ml': 'Machine Learning',
+        'dl': 'Deep Learning',
+        'k8s': 'Kubernetes',
+        'aws': 'AWS',
+        'gcp': 'Google Cloud',
+        'azure': 'Azure',
+        'vscode': 'Visual Studio Code',
+        'vs code': 'Visual Studio Code',
+        'sql server': 'SQL Server',
+        'postgresql': 'PostgreSQL',
+        'mongo': 'MongoDB',
+        'redis': 'Redis',
+        'docker': 'Docker',
+        'git': 'Git',
+        'github': 'GitHub',
+        'gitlab': 'GitLab',
+        'rest': 'REST API',
+        'api': 'API Development',
+        'ci/cd': 'CI/CD',
+        'cicd': 'CI/CD'
+    }
+    
+    # Check for aliases in normalized text
+    for alias, skill_name in skill_aliases.items():
+        # Only add if the main skill wasn't already found
+        if skill_name not in found_skills:
+            alias_pattern = r'\b' + re.escape(alias) + r'\b'
+            if re.search(alias_pattern, normalized_text):
+                found_skills.add(skill_name)
     
     return list(found_skills)  # Convert back to list for consistency
 
