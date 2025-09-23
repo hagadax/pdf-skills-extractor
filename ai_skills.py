@@ -38,6 +38,9 @@ class AISkillExtractor:
         # Initialize skill tracking
         self.ai_skill_counter = Counter()
         self.ai_monthly_skill_data = defaultdict(lambda: defaultdict(int))
+        self.ai_processed_documents = {}
+        self.ai_skill_documents = defaultdict(list)
+        self.ai_stats_blob_name = "ai_skills_stats.json"
         
         if not OPENAI_AVAILABLE:
             logger.error("OpenAI library not installed. AI extraction will be disabled.")
@@ -333,6 +336,99 @@ Rules:
                 })
         
         return chart_data
+    
+    def get_ai_stats_data(self) -> Dict[str, Any]:
+        """Get AI extraction statistics for saving."""
+        return {
+            'ai_skill_counter': dict(self.ai_skill_counter),
+            'ai_skill_documents': dict(self.ai_skill_documents),
+            'ai_processed_documents': self.ai_processed_documents,
+            'ai_monthly_skill_data': {
+                skill: dict(months) for skill, months in self.ai_monthly_skill_data.items()
+            },
+            'last_updated': datetime.now().isoformat(),
+            'version': '1.0',
+            'extraction_method': 'AI (Azure OpenAI)'
+        }
+    
+    def load_ai_stats_data(self, stats_data: Dict[str, Any]):
+        """Load AI extraction statistics."""
+        self.ai_skill_counter = Counter(stats_data.get('ai_skill_counter', {}))
+        
+        # Restore ai_skill_documents
+        skill_docs_data = stats_data.get('ai_skill_documents', {})
+        self.ai_skill_documents = defaultdict(list)
+        for skill, docs in skill_docs_data.items():
+            self.ai_skill_documents[skill] = docs
+        
+        self.ai_processed_documents = stats_data.get('ai_processed_documents', {})
+        
+        # Restore monthly data
+        monthly_data = stats_data.get('ai_monthly_skill_data', {})
+        self.ai_monthly_skill_data = defaultdict(lambda: defaultdict(int))
+        for skill, months in monthly_data.items():
+            self.ai_monthly_skill_data[skill] = defaultdict(int, months)
+    
+    def get_ai_monthly_chart_data(self):
+        """Generate chart data for AI-extracted skills."""
+        current_date = datetime.now()
+        months = []
+        
+        # Generate list of last 12 months
+        for i in range(11, -1, -1):
+            date = current_date - timedelta(days=i*30)
+            month_key = date.strftime('%Y-%m')
+            month_label = date.strftime('%b %Y')
+            months.append({'key': month_key, 'label': month_label})
+        
+        # Get top 10 AI-extracted skills
+        top_skills = [skill for skill, count in self.ai_skill_counter.most_common(10)]
+        
+        # Prepare chart data
+        chart_data = {
+            'labels': [month['label'] for month in months],
+            'datasets': []
+        }
+        
+        # Color palette (different from main chart)
+        colors = [
+            '#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b',
+            '#eb4d4b', '#6c5ce7', '#fd79a8', '#fdcb6e', '#00b894'
+        ]
+        
+        # Create dataset for each top skill
+        for i, skill in enumerate(top_skills):
+            skill_data = []
+            cumulative_count = 0
+            
+            for month in months:
+                monthly_occurrences = self.ai_monthly_skill_data[skill].get(month['key'], 0)
+                cumulative_count += monthly_occurrences
+                skill_data.append(cumulative_count)
+            
+            if cumulative_count > 0:
+                chart_data['datasets'].append({
+                    'label': f"AI: {skill}",
+                    'data': skill_data,
+                    'borderColor': colors[i % len(colors)],
+                    'backgroundColor': colors[i % len(colors)] + '20',
+                    'tension': 0.4,
+                    'fill': False,
+                    'borderDash': [5, 5]  # Dashed line to distinguish from pattern matching
+                })
+        
+        return chart_data
+    
+    def get_ai_skills_stats(self) -> List[Dict[str, Any]]:
+        """Get AI skills statistics for display."""
+        skills_list = []
+        for skill, count in self.ai_skill_counter.most_common():
+            skills_list.append({
+                'skill': skill,
+                'count': count,
+                'documents': len(self.ai_skill_documents.get(skill, []))
+            })
+        return skills_list
 
 # Global AI extractor instance
 ai_extractor = AISkillExtractor()

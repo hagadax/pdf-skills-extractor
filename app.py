@@ -619,13 +619,6 @@ def upload_file():
                         'file_type': file_type
                     })
                 
-                # Update AI statistics if AI extraction was successful
-                if ai_skills:
-                    ai_extractor.update_ai_stats(
-                        ai_skills, filename, upload_date, 
-                        file_date, file_type, ai_metadata
-                    )
-                
                 # Track processed document
                 processed_documents[filename] = {
                     'upload_date': upload_date,
