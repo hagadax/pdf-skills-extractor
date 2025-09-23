@@ -1017,7 +1017,8 @@ def get_monthly_analysis():
 def generate_monthly_analysis():
     """Generate a new monthly analysis report."""
     try:
-        data = request.get_json()
+        # Safely get JSON data, default to empty dict if not provided
+        data = request.get_json(silent=True) or {}
         target_month = data.get('month') if data else None
         
         # Generate the report
