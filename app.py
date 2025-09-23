@@ -12,8 +12,9 @@ import io
 import tempfile
 from azure.storage.blob import BlobServiceClient
 from azure.identity import DefaultAzureCredential
-from skills import tech_skills
+from skills import extract_skills, skill_counter, monthly_skill_data, skill_documents, processed_documents, tech_skills
 from ai_skills import ai_extractor
+from monthly_analysis import monthly_analyzer
 from keyvault_manager import get_application_config
 import json
 import logging
@@ -989,6 +990,68 @@ def get_file_content(filename, is_blob=True):
     except Exception as e:
         print(f"Error reading local file: {e}")
         return None
+
+@app.route('/api/monthly-analysis')
+def get_monthly_analysis():
+    """Get the latest monthly analysis report."""
+    try:
+        latest_report = monthly_analyzer.get_latest_report()
+        
+        if latest_report:
+            return jsonify({
+                'success': True,
+                'report': latest_report
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'No monthly reports available'
+            })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error retrieving monthly analysis: {str(e)}'
+        })
+
+@app.route('/api/generate-monthly-analysis', methods=['POST'])
+def generate_monthly_analysis():
+    """Generate a new monthly analysis report."""
+    try:
+        data = request.get_json()
+        target_month = data.get('month') if data else None
+        
+        # Generate the report
+        report = monthly_analyzer.generate_monthly_report(target_month)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Monthly analysis generated successfully',
+            'report': {
+                'analysis_month': report.analysis_month,
+                'total_documents': report.total_documents,
+                'total_resumes': report.total_resumes,
+                'total_job_descriptions': report.total_job_descriptions,
+                'top_technical_skills': report.top_technical_skills[:10],
+                'top_soft_skills': report.top_soft_skills[:10],
+                'emerging_skills': report.emerging_skills[:5],
+                'recommendations': report.recommendations,
+                'generated_at': report.generated_at
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error generating monthly analysis: {str(e)}'
+        })
+
+@app.route('/monthly-dashboard')
+def monthly_dashboard():
+    """Display monthly analysis dashboard."""
+    try:
+        latest_report = monthly_analyzer.get_latest_report()
+        return render_template('monthly_dashboard.html', report=latest_report)
+    except Exception as e:
+        return render_template('monthly_dashboard.html', error=str(e))
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

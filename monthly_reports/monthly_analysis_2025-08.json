@@ -1,0 +1,41 @@
+{
+  "analysis_month": "2025-08",
+  "total_documents": 0,
+  "total_resumes": 0,
+  "total_job_descriptions": 0,
+  "top_technical_skills": [],
+  "top_soft_skills": [],
+  "emerging_skills": [],
+  "declining_skills": [],
+  "ai_extraction_stats": {
+    "total_skills_extracted": 0,
+    "unique_skills": 0,
+    "avg_skills_per_document": 0.0,
+    "service_type": "Azure OpenAI",
+    "model": "gpt-35-turbo"
+  },
+  "pattern_matching_stats": {
+    "total_skills_extracted": 0,
+    "unique_skills": 0,
+    "avg_skills_per_document": 0.0
+  },
+  "skill_gap_analysis": {
+    "high_demand_low_supply": [],
+    "oversupplied_skills": [],
+    "balanced_skills": []
+  },
+  "soft_skills_trends": {
+    "most_demanded": [],
+    "total_soft_skills_mentions": 0,
+    "documents_with_soft_skills": 0
+  },
+  "recommendations": [
+    "Consider emphasizing soft skills more in job requirements and resume reviews",
+    "Consider improving skill extraction accuracy or document quality"
+  ],
+  "generated_at": "2025-09-23T18:38:32.780048",
+  "analysis_period": {
+    "start": "2025-08-01",
+    "end": "2025-08-31"
+  }
+}
