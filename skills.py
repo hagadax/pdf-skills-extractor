@@ -66,3 +66,139 @@ tech_skills = [
     "XML", "YAML", "OAuth", "JWT", "SSL", "HTTPS", "WebSockets",
     "gRPC", "Apache Kafka", "RabbitMQ", "Message Queues"
 ]
+
+# Global skill tracking variables
+from collections import Counter, defaultdict
+skill_counter = Counter()
+monthly_skill_data = defaultdict(lambda: defaultdict(int))
+skill_documents = defaultdict(list)
+processed_documents = {}
+
+# Skills extraction function
+import re
+
+def extract_skills(text):
+    """Extract technology skills from text using improved pattern matching.
+    Handles PDF text fragmentation and skill variations."""
+    found_skills = set()  # Use set to ensure uniqueness
+    
+    # Normalize text: remove excessive whitespace and line breaks
+    normalized_text = ' '.join(text.split()).lower()
+    
+    # Also create a version without spaces for compound skills
+    no_spaces_text = re.sub(r'\s+', '', text.lower())
+    
+    for skill in tech_skills:
+        skill_lower = skill.lower()
+        skill_found = False
+        
+        # Method 1: Standard word boundary matching (for simple skills)
+        pattern = r'\b' + re.escape(skill_lower) + r'\b'
+        if re.search(pattern, normalized_text):
+            skill_found = True
+        
+        # Method 2: Flexible matching for compound skills (allows spaces/dots)
+        # Handle skills like "Node.js", "Vue.js", "C++", "C#", etc.
+        flexible_pattern = re.escape(skill_lower)
+        flexible_pattern = flexible_pattern.replace(r'\.', r'[\.\s]*')  # . or spaces
+        flexible_pattern = flexible_pattern.replace(r'\+', r'[\+\s]*')  # + or spaces  
+        flexible_pattern = flexible_pattern.replace(r'\#', r'[\#\s]*')  # # or spaces
+        flexible_pattern = flexible_pattern.replace(r'\s', r'\s*')      # flexible spaces
+        
+        if re.search(r'\b' + flexible_pattern + r'\b', normalized_text):
+            skill_found = True
+        
+        # Method 3: No-spaces matching for fragmented text
+        skill_no_spaces = re.sub(r'[\s\.\+\#-]', '', skill_lower)
+        if len(skill_no_spaces) > 2 and skill_no_spaces in no_spaces_text:
+            skill_found = True
+        
+        # Method 4: Partial matching for longer skills (be more careful here)
+        if len(skill_lower) > 4:
+            # Split longer skills and check if major parts are present
+            words = skill_lower.split()
+            if len(words) > 1:
+                # For multi-word skills, check if all words are present nearby
+                all_words_found = True
+                for word in words:
+                    if len(word) > 2 and word not in normalized_text:
+                        all_words_found = False
+                        break
+                if all_words_found:
+                    skill_found = True
+        
+        if skill_found:
+            found_skills.add(skill)
+    
+    return list(found_skills)
+
+def categorize_skills(skills_list):
+    """Categorize skills into technical and soft skills."""
+    technical_skills = []
+    soft_skills = []
+    
+    # Extended list of common soft skills
+    soft_skill_keywords = [
+        'communication', 'leadership', 'teamwork', 'problem solving', 
+        'critical thinking', 'creativity', 'adaptability', 'time management',
+        'project management', 'analytical', 'detail oriented', 'organized',
+        'collaborative', 'innovative', 'strategic', 'mentoring', 'coaching',
+        'presentation', 'negotiation', 'decision making', 'interpersonal',
+        'customer service', 'conflict resolution', 'emotional intelligence',
+        'multitasking', 'self motivated', 'proactive', 'reliable',
+        'flexible', 'patient', 'empathetic', 'diplomatic', 'persuasive'
+    ]
+    
+    for skill in skills_list:
+        skill_lower = skill.lower()
+        is_soft_skill = any(keyword in skill_lower for keyword in soft_skill_keywords)
+        
+        if is_soft_skill:
+            soft_skills.append(skill)
+        else:
+            # Check if it's in our tech skills list
+            if skill in tech_skills:
+                technical_skills.append(skill)
+            else:
+                # If not clearly categorized, treat as technical by default
+                technical_skills.append(skill)
+    
+    return {
+        'technical': technical_skills,
+        'soft': soft_skills
+    }
+
+def get_skill_statistics():
+    """Get current skill statistics."""
+    return {
+        'total_skills': len(skill_counter),
+        'total_extractions': sum(skill_counter.values()),
+        'top_skills': skill_counter.most_common(10),
+        'total_documents': len(processed_documents)
+    }
+
+def update_skill_tracking(document_name, skills):
+    """Update skill tracking data."""
+    global skill_counter, skill_documents, processed_documents
+    from datetime import datetime
+    
+    # Update counters
+    for skill in skills:
+        skill_counter[skill] += 1
+        skill_documents[skill].append(document_name)
+    
+    # Track document
+    processed_documents[document_name] = {
+        'skills': skills,
+        'processed_at': datetime.now().isoformat(),
+        'skill_count': len(skills)
+    }
+    
+    # Update monthly data
+    current_month = datetime.now().strftime('%Y-%m')
+    for skill in skills:
+        monthly_skill_data[current_month][skill] += 1
+
+def get_monthly_skill_data():
+    """Get monthly skill tracking data."""
+    return dict(monthly_skill_data)
