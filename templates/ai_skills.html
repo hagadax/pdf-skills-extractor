@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>All Skills - PDF Skills Extractor</title>
+    <title>AI Skills - PDF Skills Extractor</title>
     <style>
         * {
             margin: 0;
@@ -44,20 +44,29 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 2rem;
-            padding-bottom: 1rem;
-            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
         .skills-title {
             font-size: 1.8rem;
             color: #333;
         }
         .total-count {
-            background: #667eea;
+            background: #ff6b6b;
             color: white;
             padding: 0.5rem 1rem;
             border-radius: 20px;
             font-weight: bold;
+        }
+        .ai-badge {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-left: 0.5rem;
         }
         .skills-grid {
             display: grid;
@@ -68,7 +77,7 @@
             background: #f8f9fa;
             border-radius: 10px;
             padding: 1.5rem;
-            border-left: 4px solid #667eea;
+            border-left: 4px solid #ff6b6b;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
         .skill-card:hover {
@@ -82,19 +91,14 @@
             margin-bottom: 0.5rem;
         }
         .skill-count {
-            font-size: 1.5rem;
+            font-size: 2rem;
             font-weight: bold;
-            color: #667eea;
+            color: #ff6b6b;
+            margin-bottom: 0.25rem;
         }
         .skill-label {
             color: #6c757d;
             font-size: 0.9rem;
-        }
-        .no-skills {
-            text-align: center;
-            color: #6c757d;
-            font-size: 1.1rem;
-            margin: 3rem 0;
         }
         .search-box {
             margin-bottom: 2rem;
@@ -107,7 +111,28 @@
         }
         .search-box:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #ff6b6b;
+        }
+        .no-skills {
+            text-align: center;
+            color: #6c757d;
+            font-size: 1.1rem;
+            margin: 3rem 0;
+        }
+        .info-banner {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .info-banner h3 {
+            margin-bottom: 0.5rem;
+        }
+        .info-banner p {
+            opacity: 0.9;
+            font-size: 0.9rem;
         }
         @media (max-width: 768px) {
             .skills-grid {
@@ -115,8 +140,7 @@
             }
             .skills-header {
                 flex-direction: column;
-                align-items: flex-start;
-                gap: 1rem;
+                text-align: center;
             }
         }
     </style>
@@ -126,32 +150,40 @@
     
     <div class="container">
         <div class="header">
-            <h1>All Skills</h1>
-            <p>Complete list of extracted technology skills</p>
+            <h1>AI-Extracted Skills <span class="ai-badge">🤖 AI POWERED</span></h1>
+            <p>Skills extracted using OpenAI GPT models for intelligent analysis</p>
+        </div>
+
+        <div class="info-banner">
+            <h3>🧠 AI-Powered Skill Extraction</h3>
+            <p>These skills were extracted using advanced AI models that understand context, synonyms, and technical variations better than pattern matching.</p>
         </div>
 
         <div class="skills-container">
             <div class="skills-header">
-                <h2 class="skills-title">Technology Skills</h2>
-                <div class="total-count">{{ skills|length }} Total Skills</div>
+                <h2 class="skills-title">AI-Detected Skills</h2>
+                <div class="total-count">{{ ai_skills|length }} AI Skills</div>
             </div>
 
-            {% if skills %}
-                <input type="text" id="searchBox" class="search-box" placeholder="Search skills..." onkeyup="filterSkills()">
+            {% if ai_skills %}
+                <input type="text" id="searchBox" class="search-box" placeholder="Search AI-extracted skills..." onkeyup="filterSkills()">
                 
                 <div class="skills-grid" id="skillsGrid">
-                    {% for skill, count in skills %}
+                    {% for skill, count in ai_skills %}
                         <div class="skill-card" data-skill="{{ skill.lower() }}">
                             <div class="skill-name">{{ skill }}</div>
                             <div class="skill-count">{{ count }}</div>
-                            <div class="skill-label">occurrences</div>
+                            <div class="skill-label">AI detections</div>
                         </div>
                     {% endfor %}
                 </div>
             {% else %}
                 <div class="no-skills">
-                    <h3>No skills found</h3>
-                    <p>Upload some PDF documents to start tracking skills!</p>
+                    <h3>🤖 No AI skills extracted yet</h3>
+                    <p>Upload some documents to see AI-powered skill extraction in action!</p>
+                    <p style="margin-top: 1rem; font-size: 0.9rem; color: #999;">
+                        Note: AI extraction requires an OpenAI API key to be configured.
+                    </p>
                 </div>
             {% endif %}
         </div>

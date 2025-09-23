@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skill Extraction Comparison - PDF Skills Extractor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            color: white;
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        .comparison-container {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+        .extraction-panel {
+            border-radius: 10px;
+            padding: 1.5rem;
+            border: 2px solid transparent;
+        }
+        .pattern-panel {
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            color: white;
+            border-color: #0984e3;
+        }
+        .ai-panel {
+            background: linear-gradient(135deg, #fd79a8, #e84393);
+            color: white;
+            border-color: #e84393;
+        }
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+        .panel-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .panel-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        .skills-count {
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        .skills-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+        .skill-item {
+            background: rgba(255, 255, 255, 0.1);
+            margin-bottom: 0.5rem;
+            padding: 0.8rem;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .skill-name {
+            font-weight: 500;
+        }
+        .skill-count {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        .stats-container {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1.5rem;
+            text-align: center;
+            border-left: 4px solid;
+        }
+        .stat-card.pattern {
+            border-left-color: #74b9ff;
+        }
+        .stat-card.ai {
+            border-left-color: #fd79a8;
+        }
+        .stat-card.overlap {
+            border-left-color: #00b894;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        .unique-skills {
+            margin-top: 2rem;
+        }
+        .unique-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .unique-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+        .unique-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .unique-tag {
+            background: #007bff;
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        .unique-tag.ai-only {
+            background: #e84393;
+        }
+        .unique-tag.pattern-only {
+            background: #0984e3;
+        }
+        .no-data {
+            text-align: center;
+            color: #6c757d;
+            padding: 3rem;
+        }
+        @media (max-width: 768px) {
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include '_navigation.html' %}
+    
+    <div class="container">
+        <div class="header">
+            <h1>Skill Extraction Comparison</h1>
+            <p>Compare pattern matching vs AI-powered skill extraction methods</p>
+        </div>
+
+        {% if pattern_skills or ai_skills %}
+            <div class="comparison-container">
+                <div class="comparison-grid">
+                    <!-- Pattern Matching Panel -->
+                    <div class="extraction-panel pattern-panel">
+                        <div class="panel-header">
+                            <div class="panel-title">🔍 Pattern Matching</div>
+                            <div class="panel-badge">Traditional</div>
+                        </div>
+                        <div class="skills-count">{{ pattern_skills|length }}</div>
+                        <div style="text-align: center; margin-bottom: 1rem;">Skills Found</div>
+                        
+                        {% if pattern_skills %}
+                            <div class="skills-list">
+                                {% for skill, count in pattern_skills %}
+                                    <div class="skill-item">
+                                        <span class="skill-name">{{ skill }}</span>
+                                        <span class="skill-count">{{ count }}</span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div style="text-align: center; opacity: 0.7;">No pattern skills found</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- AI Panel -->
+                    <div class="extraction-panel ai-panel">
+                        <div class="panel-header">
+                            <div class="panel-title">🤖 AI Extraction</div>
+                            <div class="panel-badge">OpenAI GPT</div>
+                        </div>
+                        <div class="skills-count">{{ ai_skills|length }}</div>
+                        <div style="text-align: center; margin-bottom: 1rem;">Skills Found</div>
+                        
+                        {% if ai_skills %}
+                            <div class="skills-list">
+                                {% for skill, count in ai_skills %}
+                                    <div class="skill-item">
+                                        <span class="skill-name">{{ skill }}</span>
+                                        <span class="skill-count">{{ count }}</span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div style="text-align: center; opacity: 0.7;">No AI skills found</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-container">
+                <h2 style="margin-bottom: 1rem;">📊 Comparison Statistics</h2>
+                <div class="stats-grid">
+                    <div class="stat-card pattern">
+                        <div class="stat-value" style="color: #74b9ff;">{{ pattern_skills|length }}</div>
+                        <div class="stat-label">Pattern Skills</div>
+                    </div>
+                    <div class="stat-card ai">
+                        <div class="stat-value" style="color: #fd79a8;">{{ ai_skills|length }}</div>
+                        <div class="stat-label">AI Skills</div>
+                    </div>
+                    <div class="stat-card overlap">
+                        <div class="stat-value" style="color: #00b894;">{{ overlap_count }}</div>
+                        <div class="stat-label">Common Skills</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" style="color: #636e72;">{{ total_unique }}</div>
+                        <div class="stat-label">Total Unique Skills</div>
+                    </div>
+                </div>
+
+                {% if unique_ai_skills or unique_pattern_skills %}
+                    <div class="unique-skills">
+                        {% if unique_ai_skills %}
+                            <div class="unique-section">
+                                <div class="unique-title">🤖 AI-Only Skills ({{ unique_ai_skills|length }})</div>
+                                <div class="unique-list">
+                                    {% for skill in unique_ai_skills %}
+                                        <span class="unique-tag ai-only">{{ skill }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        {% if unique_pattern_skills %}
+                            <div class="unique-section">
+                                <div class="unique-title">🔍 Pattern-Only Skills ({{ unique_pattern_skills|length }})</div>
+                                <div class="unique-list">
+                                    {% for skill in unique_pattern_skills %}
+                                        <span class="unique-tag pattern-only">{{ skill }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="comparison-container">
+                <div class="no-data">
+                    <h3>📊 No comparison data available</h3>
+                    <p>Upload some documents to see a side-by-side comparison of extraction methods.</p>
+                    <p style="margin-top: 1rem; font-size: 0.9rem; color: #999;">
+                        Note: AI extraction requires an OpenAI API key to be configured.
+                    </p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>

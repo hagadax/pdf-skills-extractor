@@ -13,15 +13,26 @@ import tempfile
 from azure.storage.blob import BlobServiceClient
 from azure.identity import DefaultAzureCredential
 from skills import tech_skills
+from ai_skills import ai_extractor
+from keyvault_manager import get_application_config
 import json
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# Get configuration from Key Vault with environment fallbacks
+config = get_application_config()
+
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here')
 app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = int(os.environ.get('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))
 
-# Azure Blob Storage configuration
-AZURE_STORAGE_CONNECTION_STRING = os.environ.get('AZURE_STORAGE_CONNECTION_STRING')
+# Azure Blob Storage configuration from Key Vault
+AZURE_STORAGE_CONNECTION_STRING = config.get('azure_storage_connection_string')
 AZURE_STORAGE_CONTAINER_NAME = os.environ.get('AZURE_STORAGE_CONTAINER_NAME', 'uploads')
 
 # Initialize Azure Blob Service Client with Managed Identity
@@ -92,10 +103,38 @@ def save_stats_to_blob():
         
         blob_client.upload_blob(stats_json, overwrite=True)
         print(f"Stats saved to blob storage successfully at {datetime.now()}")
+        
+        # Also save AI statistics
+        save_ai_stats_to_blob()
+        
         return True
         
     except Exception as e:
         print(f"Error saving stats to blob storage: {e}")
+        return False
+
+def save_ai_stats_to_blob():
+    """Save AI extraction statistics to Azure Blob Storage."""
+    try:
+        blob_service_client = get_blob_service_client()
+        if not blob_service_client:
+            return False
+        
+        ai_stats_data = ai_extractor.get_ai_stats_data()
+        ai_stats_json = json.dumps(ai_stats_data, indent=2, default=str)
+        
+        # Upload AI stats to blob storage
+        ai_blob_client = blob_service_client.get_blob_client(
+            container=STATS_CONTAINER_NAME,
+            blob=ai_extractor.ai_stats_blob_name
+        )
+        
+        ai_blob_client.upload_blob(ai_stats_json, overwrite=True)
+        print(f"AI stats saved to blob storage successfully at {datetime.now()}")
+        return True
+        
+    except Exception as e:
+        print(f"Error saving AI stats to blob storage: {e}")
         return False
 
 def load_stats_from_blob():
@@ -148,12 +187,46 @@ def load_stats_from_blob():
         print(f"  Documents: {len(processed_documents)}")
         print(f"  Skills: {len(skill_counter)}")
         
+        # Also load AI statistics
+        load_ai_stats_from_blob()
+        
         return True
         
     except Exception as e:
         print(f"Error loading stats from blob storage: {e}")
         import traceback
         traceback.print_exc()
+        return False
+
+def load_ai_stats_from_blob():
+    """Load AI extraction statistics from Azure Blob Storage."""
+    try:
+        blob_service_client = get_blob_service_client()
+        if not blob_service_client:
+            return False
+        
+        ai_blob_client = blob_service_client.get_blob_client(
+            container=STATS_CONTAINER_NAME,
+            blob=ai_extractor.ai_stats_blob_name
+        )
+        
+        if not ai_blob_client.exists():
+            print("Info: No existing AI stats found, starting with empty AI stats")
+            return False
+        
+        ai_stats_content = ai_blob_client.download_blob().readall()
+        ai_stats_data = json.loads(ai_stats_content.decode('utf-8'))
+        
+        ai_extractor.load_ai_stats_data(ai_stats_data)
+        
+        print(f"AI stats loaded from blob storage successfully")
+        print(f"  AI Documents: {len(ai_extractor.ai_processed_documents)}")
+        print(f"  AI Skills: {len(ai_extractor.ai_skill_counter)}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error loading AI stats from blob storage: {e}")
         return False
 
 # Load stats on application startup
@@ -473,7 +546,8 @@ def index():
                          top_skills=top_skills, 
                          total_documents=total_documents,
                          total_skills=len(skill_counter),
-                         chart_data=chart_data)
+                         chart_data=chart_data,
+                         page_name='home')
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -511,14 +585,26 @@ def upload_file():
                 return jsonify({'success': False, 'message': 'Unsupported file type'})
             
             if text:
-                # Extract skills from text (each skill only counted once per document)
+                # Extract skills from text using pattern matching (existing method)
                 found_skills = extract_skills(text)
+                
+                # Extract skills using AI (new method)
+                ai_skills = []
+                ai_metadata = {}
+                try:
+                    # Determine document type from filename
+                    doc_type = "resume" if any(term in filename.lower() for term in ["cv", "resume"]) else "job_description"
+                    ai_skills, ai_metadata = ai_extractor.extract_skills_from_text(text, doc_type)
+                    print(f"AI extracted {len(ai_skills)} skills: {ai_skills}")
+                except Exception as e:
+                    print(f"AI extraction failed: {e}")
+                    ai_metadata = {'error': str(e)}
                 
                 # Get month key for tracking (use file date if available, otherwise upload date)
                 date_for_tracking = file_date if file_date else upload_date.split(' ')[0]
                 month_key = date_for_tracking[:7]  # Get YYYY-MM format
                 
-                # Update global skill counter (each unique skill from this document)
+                # Update global skill counter (pattern matching)
                 for skill in found_skills:
                     skill_counter[skill] += 1  # +1 per document, regardless of skill frequency in text
                     
@@ -533,11 +619,20 @@ def upload_file():
                         'file_type': file_type
                     })
                 
+                # Update AI statistics if AI extraction was successful
+                if ai_skills:
+                    ai_extractor.update_ai_stats(
+                        ai_skills, filename, upload_date, 
+                        file_date, file_type, ai_metadata
+                    )
+                
                 # Track processed document
                 processed_documents[filename] = {
                     'upload_date': upload_date,
                     'file_date': file_date or upload_date.split(' ')[0],
                     'skills_found': found_skills,
+                    'ai_skills_found': ai_skills,
+                    'ai_metadata': ai_metadata,
                     'storage_type': 'blob' if is_blob else 'local',
                     'file_type': file_type
                 }
@@ -569,12 +664,29 @@ def upload_file():
                 
                 storage_msg = 'Azure Blob Storage' if is_blob else 'local storage'
                 file_type_msg = 'PDF' if file_type == 'pdf' else 'Excel'
+                
+                # Create response message
+                response_message = f'Successfully processed {file_type_msg} file {filename} (saved to {storage_msg}).\n'
+                response_message += f'Pattern Matching found {len(found_skills)} skills: {", ".join(found_skills)}'
+                
+                if ai_skills:
+                    response_message += f'\nAI Extraction found {len(ai_skills)} skills: {", ".join(ai_skills)}'
+                elif 'error' in ai_metadata:
+                    response_message += f'\nAI Extraction failed: {ai_metadata["error"]}'
+                else:
+                    response_message += f'\nAI Extraction: No OpenAI API key configured'
+                
                 return jsonify({
                     'success': True, 
-                    'message': f'Successfully processed {file_type_msg} file {filename} (saved to {storage_msg}). Found {len(found_skills)} skills: {", ".join(found_skills)}',
+                    'message': response_message,
                     'skills': found_skills,
+                    'ai_skills': ai_skills,
                     'filename': filename,
-                    'file_type': file_type
+                    'file_type': file_type,
+                    'extraction_methods': {
+                        'pattern_matching': len(found_skills),
+                        'ai_extraction': len(ai_skills)
+                    }
                 })
             else:
                 file_type_msg = 'PDF' if file_type == 'pdf' else 'Excel'
@@ -592,6 +704,39 @@ def api_skills():
         'total_skills': len(skill_counter),
         'skills': dict(skill_counter),
         'top_skills': skill_counter.most_common(20)
+    })
+
+@app.route('/api/ai-skills')
+def api_ai_skills():
+    """API endpoint to get AI-extracted skill statistics as JSON."""
+    return jsonify({
+        'total_ai_skills': len(ai_extractor.ai_skill_counter),
+        'ai_skills': dict(ai_extractor.ai_skill_counter),
+        'top_ai_skills': ai_extractor.ai_skill_counter.most_common(20),
+        'extraction_method': 'AI (OpenAI GPT)'
+    })
+
+@app.route('/api/comparison')
+def api_comparison():
+    """API endpoint to compare pattern matching vs AI extraction results."""
+    pattern_skills = set(skill_counter.keys())
+    ai_skills = set(ai_extractor.ai_skill_counter.keys())
+    
+    return jsonify({
+        'pattern_matching': {
+            'total_skills': len(pattern_skills),
+            'top_skills': skill_counter.most_common(10)
+        },
+        'ai_extraction': {
+            'total_skills': len(ai_skills),
+            'top_skills': ai_extractor.ai_skill_counter.most_common(10)
+        },
+        'comparison': {
+            'common_skills': len(pattern_skills.intersection(ai_skills)),
+            'pattern_only': len(pattern_skills - ai_skills),
+            'ai_only': len(ai_skills - pattern_skills),
+            'overlap_percentage': round(len(pattern_skills.intersection(ai_skills)) / max(len(pattern_skills.union(ai_skills)), 1) * 100, 2)
+        }
     })
 
 @app.route('/api/health')
@@ -635,7 +780,31 @@ def reload_stats():
 def skills_page():
     """Page showing all skill statistics."""
     all_skills = skill_counter.most_common()
-    return render_template('skills.html', skills=all_skills)
+    return render_template('skills.html', skills=all_skills, page_name='skills')
+
+@app.route('/ai-skills')
+def ai_skills_page():
+    """Page showing AI-extracted skill statistics."""
+    all_ai_skills = ai_extractor.ai_skill_counter.most_common()
+    return render_template('ai_skills.html', ai_skills=all_ai_skills, page_name='ai-skills')
+
+@app.route('/comparison')
+def comparison_page():
+    """Page comparing pattern matching vs AI extraction results."""
+    # Get data for comparison
+    pattern_skills = skill_counter.most_common(20)
+    ai_skills = ai_extractor.ai_skill_counter.most_common(20)
+    
+    # Get chart data for both methods
+    pattern_chart_data = get_monthly_chart_data()
+    ai_chart_data = ai_extractor.get_ai_monthly_chart_data()
+    
+    return render_template('comparison.html', 
+                         pattern_skills=pattern_skills,
+                         ai_skills=ai_skills,
+                         pattern_chart_data=pattern_chart_data,
+                         ai_chart_data=ai_chart_data,
+                         page_name='comparison')
 
 @app.route('/skill-details')
 def skill_details():
@@ -651,12 +820,12 @@ def skill_details():
             'documents': documents
         })
     
-    return render_template('skill_details.html', skills_data=skills_with_docs)
+    return render_template('skill_details.html', skills_data=skills_with_docs, page_name='skill-details')
 
 @app.route('/documents')
 def documents_page():
     """Page showing all processed documents."""
-    return render_template('documents.html', documents=processed_documents)
+    return render_template('documents.html', documents=processed_documents, page_name='documents')
 
 @app.route('/about')
 def about_page():
@@ -681,7 +850,8 @@ def about_page():
                          unique_skills_found=unique_skills_found,
                          total_documents=total_documents,
                          total_skill_occurrences=total_skill_occurrences,
-                         total_categories=total_categories)
+                         total_categories=total_categories,
+                         page_name='about')
 
 # Azure Blob Storage helper functions
 # Stats persistence functions

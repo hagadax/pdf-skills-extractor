@@ -34,24 +34,6 @@
             font-size: 1.1rem;
             opacity: 0.9;
         }
-        .back-nav {
-            margin-bottom: 2rem;
-        }
-        .back-btn {
-            background: white;
-            color: #667eea;
-            border: 2px solid #667eea;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            display: inline-block;
-        }
-        .back-btn:hover {
-            background: #667eea;
-            color: white;
-        }
         .about-container {
             background: white;
             border-radius: 15px;
@@ -184,14 +166,12 @@
     </style>
 </head>
 <body>
+    {% include '_navigation.html' %}
+    
     <div class="container">
         <div class="header">
             <h1>About PDF Skills Extractor</h1>
             <p>Understanding technology trends through document analysis</p>
-        </div>
-
-        <div class="back-nav">
-            <a href="/" class="back-btn">← Back to Home</a>
         </div>
 
         <div class="about-container">
