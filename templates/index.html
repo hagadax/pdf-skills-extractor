@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Skills Extractor</title>
+    <title>PDF & Excel Skills Extractor</title>
     <style>
         * {
             margin: 0;
@@ -333,7 +333,7 @@
     <!-- Navigation Menu -->
     <nav class="navbar">
         <div class="nav-container">
-            <div class="logo">PDF Skills Extractor</div>
+            <div class="logo">PDF & Excel Skills Extractor</div>
             <ul class="nav-menu">
                 <li class="nav-item"><a href="/" class="active">Home</a></li>
                 <li class="nav-item"><a href="/skills">All Skills</a></li>
@@ -341,6 +341,7 @@
                 <li class="nav-item"><a href="/documents">Documents</a></li>
                 <li class="nav-item"><a href="/about">About</a></li>
                 <li class="nav-item"><a href="/api/skills">API</a></li>
+                <li class="nav-item"><a href="/api/health" style="color: #28a745;">Health</a></li>
             </ul>
             <div class="nav-toggle">
                 <span></span>
@@ -361,8 +362,8 @@
 
     <div class="container">
         <div class="header">
-            <h1>PDF Skills Extractor</h1>
-            <p>Upload PDF documents to extract and track technology skills</p>
+            <h1>PDF & Excel Skills Extractor</h1>
+            <p>Upload PDF or Excel documents to extract and track technology skills</p>
         </div>
 
         {% with messages = get_flashed_messages() %}
@@ -393,9 +394,9 @@
                 <h2>Upload PDF Document</h2>
                 <form id="uploadForm" enctype="multipart/form-data" class="upload-form">
                     <div class="file-input-wrapper">
-                        <input type="file" name="file" accept=".pdf" class="file-input" id="fileInput" required>
+                        <input type="file" name="file" accept=".pdf,.xlsx,.xls" class="file-input" id="fileInput" required>
                         <div class="file-input-text">
-                            <strong>Click to select a PDF file</strong><br>
+                            <strong>Click to select a PDF or Excel file</strong><br>
                             <small>Maximum file size: 16MB</small>
                         </div>
                     </div>

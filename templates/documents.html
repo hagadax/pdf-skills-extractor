@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Documents - PDF Skills Extractor</title>
+    <title>Documents - PDF & Excel Skills Extractor</title>
     <style>
         * {
             margin: 0;
@@ -192,9 +192,24 @@
                 <div class="documents-grid" id="documentsGrid">
                     {% for filename, doc_data in documents.items() %}
                         <div class="document-card" data-filename="{{ filename.lower() }}" data-skills="{{ doc_data.skills_found|join(' ')|lower }}">
-                            <div class="document-name">📄 {{ filename }}</div>
+                            <div class="document-name">
+                                {% if doc_data.file_type == 'excel' %}
+                                    📊 {{ filename }}
+                                {% else %}
+                                    📄 {{ filename }}
+                                {% endif %}
+                            </div>
                             
                             <div class="document-info">
+                                <div class="info-label">File Type:</div>
+                                <div class="info-value">
+                                    {% if doc_data.file_type == 'excel' %}
+                                        Excel
+                                    {% else %}
+                                        PDF
+                                    {% endif %}
+                                </div>
+                                
                                 <div class="info-label">File Date:</div>
                                 <div class="info-value">{{ doc_data.file_date }}</div>
                                 

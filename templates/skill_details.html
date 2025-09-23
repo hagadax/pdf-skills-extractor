@@ -248,7 +248,13 @@
                                 <div class="documents-list">
                                     {% for doc in skill_data.documents %}
                                         <div class="document-item">
-                                            <div class="document-name">📄 {{ doc.filename }}</div>
+                                            <div class="document-name">
+                                                {% if doc.file_type == 'excel' %}
+                                                    � {{ doc.filename }}
+                                                {% else %}
+                                                    �📄 {{ doc.filename }}
+                                                {% endif %}
+                                            </div>
                                             <div class="document-dates">
                                                 <div class="file-date">
                                                     <span class="date-label">File:</span>{{ doc.file_date }}

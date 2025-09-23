@@ -2,6 +2,9 @@ from flask import Flask, request, render_template, redirect, url_for, flash, jso
 import os
 import re
 import PyPDF2
+import openpyxl
+import xlrd
+import pandas as pd
 from werkzeug.utils import secure_filename
 from collections import defaultdict, Counter
 from datetime import datetime
@@ -74,7 +77,8 @@ def save_stats_to_blob():
             'monthly_skill_data': {
                 skill: dict(months) for skill, months in monthly_skill_data.items()
             },
-            'last_updated': datetime.now().isoformat()
+            'last_updated': datetime.now().isoformat(),
+            'version': '1.0'  # For future compatibility
         }
         
         # Convert to JSON
@@ -87,7 +91,7 @@ def save_stats_to_blob():
         )
         
         blob_client.upload_blob(stats_json, overwrite=True)
-        print("Stats saved to blob storage successfully")
+        print(f"Stats saved to blob storage successfully at {datetime.now()}")
         return True
         
     except Exception as e:
@@ -136,21 +140,32 @@ def load_stats_from_blob():
             monthly_skill_data[skill] = defaultdict(int, months)
         
         last_updated = stats_data.get('last_updated', 'Unknown')
-        print(f"Stats loaded from blob storage successfully (last updated: {last_updated})")
+        version = stats_data.get('version', 'Unknown')
+        
+        print(f"Stats loaded from blob storage successfully")
+        print(f"  Last updated: {last_updated}")
+        print(f"  Version: {version}")
+        print(f"  Documents: {len(processed_documents)}")
+        print(f"  Skills: {len(skill_counter)}")
+        
         return True
         
     except Exception as e:
         print(f"Error loading stats from blob storage: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 # Load stats on application startup
 try:
     load_stats_from_blob()
+    print("Application stats loaded successfully on startup")
 except Exception as e:
     print(f"Failed to load stats on startup: {e}")
+    print("Starting with empty stats")
 
 # Allowed file extensions
-ALLOWED_EXTENSIONS = {'pdf'}
+ALLOWED_EXTENSIONS = {'pdf', 'xlsx', 'xls'}
 
 def allowed_file(filename):
     """Check if the uploaded file has an allowed extension."""
@@ -211,6 +226,98 @@ def get_pdf_creation_date(file_content):
     except Exception as e:
         print(f"Error extracting PDF date: {e}")
         return None
+
+def extract_text_from_excel(file_content, filename):
+    """Extract text content from an Excel file (from bytes)."""
+    try:
+        # Determine file type by extension
+        file_extension = filename.lower().split('.')[-1]
+        
+        # Create a BytesIO object from the file content
+        excel_file = io.BytesIO(file_content)
+        
+        # Read Excel file based on extension
+        if file_extension == 'xlsx':
+            # Use openpyxl for .xlsx files
+            workbook = openpyxl.load_workbook(excel_file, read_only=True, data_only=True)
+            text_content = []
+            
+            for sheet_name in workbook.sheetnames:
+                sheet = workbook[sheet_name]
+                for row in sheet.iter_rows(values_only=True):
+                    for cell in row:
+                        if cell is not None:
+                            text_content.append(str(cell))
+            
+            workbook.close()
+            
+        elif file_extension == 'xls':
+            # Use xlrd for .xls files
+            workbook = xlrd.open_workbook(file_contents=file_content)
+            text_content = []
+            
+            for sheet_index in range(workbook.nsheets):
+                sheet = workbook.sheet_by_index(sheet_index)
+                for row_index in range(sheet.nrows):
+                    for col_index in range(sheet.ncols):
+                        cell_value = sheet.cell_value(row_index, col_index)
+                        if cell_value:
+                            text_content.append(str(cell_value))
+        else:
+            return ""
+        
+        # Join all text with spaces and clean up
+        text = " ".join(text_content)
+        
+        # Clean up common Excel extraction issues
+        text = re.sub(r'\s+', ' ', text)  # Replace multiple spaces with single space
+        text = text.strip()
+        
+        return text
+        
+    except Exception as e:
+        print(f"Error extracting text from Excel file: {e}")
+        return ""
+
+def get_excel_creation_date(file_content, filename):
+    """Extract creation date from Excel metadata (from bytes)."""
+    try:
+        file_extension = filename.lower().split('.')[-1]
+        excel_file = io.BytesIO(file_content)
+        
+        if file_extension == 'xlsx':
+            # Use openpyxl for .xlsx files
+            workbook = openpyxl.load_workbook(excel_file, read_only=True)
+            
+            # Try to get creation date from document properties
+            if hasattr(workbook, 'properties') and workbook.properties:
+                if hasattr(workbook.properties, 'created') and workbook.properties.created:
+                    return workbook.properties.created.strftime('%Y-%m-%d')
+                elif hasattr(workbook.properties, 'modified') and workbook.properties.modified:
+                    return workbook.properties.modified.strftime('%Y-%m-%d')
+            
+            workbook.close()
+            
+        elif file_extension == 'xls':
+            # For .xls files, xlrd doesn't provide easy access to metadata
+            # We could use pandas as an alternative but it's less reliable for dates
+            pass
+            
+        return None
+        
+    except Exception as e:
+        print(f"Error extracting Excel date: {e}")
+        return None
+
+def get_file_type(filename):
+    """Determine file type based on extension."""
+    extension = filename.lower().split('.')[-1]
+    if extension == 'pdf':
+        return 'pdf'
+    elif extension in ['xlsx', 'xls']:
+        return 'excel'
+    else:
+        return 'unknown'
 
 def extract_skills(text):
     """Extract technology skills from text using improved pattern matching.
@@ -370,7 +477,7 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    """Handle PDF file upload and skill extraction."""
+    """Handle PDF and Excel file upload and skill extraction."""
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': 'No file selected'})
     
@@ -386,12 +493,22 @@ def upload_file():
             # Save file to Azure Blob Storage or local storage
             file_content, is_blob = save_file_safely(file, filename)
             
-            # Get upload date and file creation date
+            # Get upload date
             upload_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            file_date = get_pdf_creation_date(file_content)
             
-            # Extract text from PDF
-            text = extract_text_from_pdf(file_content)
+            # Determine file type and extract content accordingly
+            file_type = get_file_type(filename)
+            
+            if file_type == 'pdf':
+                # Extract text and metadata from PDF
+                text = extract_text_from_pdf(file_content)
+                file_date = get_pdf_creation_date(file_content)
+            elif file_type == 'excel':
+                # Extract text and metadata from Excel
+                text = extract_text_from_excel(file_content, filename)
+                file_date = get_excel_creation_date(file_content, filename)
+            else:
+                return jsonify({'success': False, 'message': 'Unsupported file type'})
             
             if text:
                 # Extract skills from text (each skill only counted once per document)
@@ -412,7 +529,8 @@ def upload_file():
                     skill_documents[skill].append({
                         'filename': filename,
                         'upload_date': upload_date,
-                        'file_date': file_date or upload_date.split(' ')[0]  # Use upload date if no file date
+                        'file_date': file_date or upload_date.split(' ')[0],  # Use upload date if no file date
+                        'file_type': file_type
                     })
                 
                 # Track processed document
@@ -420,26 +538,52 @@ def upload_file():
                     'upload_date': upload_date,
                     'file_date': file_date or upload_date.split(' ')[0],
                     'skills_found': found_skills,
-                    'storage_type': 'blob' if is_blob else 'local'
+                    'storage_type': 'blob' if is_blob else 'local',
+                    'file_type': file_type
                 }
                 
                 # Save stats to blob storage after processing
                 save_stats_to_blob()
                 
+                # Also save a backup with timestamp for data recovery
+                try:
+                    backup_blob_name = f'backups/stats_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+                    blob_service_client = get_blob_service_client()
+                    if blob_service_client:
+                        backup_stats = {
+                            'skill_counter': dict(skill_counter),
+                            'processed_documents': processed_documents,
+                            'backup_timestamp': datetime.now().isoformat()
+                        }
+                        backup_blob_client = blob_service_client.get_blob_client(
+                            container=STATS_CONTAINER_NAME,
+                            blob=backup_blob_name
+                        )
+                        backup_blob_client.upload_blob(
+                            json.dumps(backup_stats, indent=2).encode('utf-8'), 
+                            overwrite=True
+                        )
+                        print(f"Backup created: {backup_blob_name}")
+                except Exception as backup_error:
+                    print(f"Warning: Failed to create backup: {backup_error}")
+                
                 storage_msg = 'Azure Blob Storage' if is_blob else 'local storage'
+                file_type_msg = 'PDF' if file_type == 'pdf' else 'Excel'
                 return jsonify({
                     'success': True, 
-                    'message': f'Successfully processed {filename} (saved to {storage_msg}). Found {len(found_skills)} skills: {", ".join(found_skills)}',
+                    'message': f'Successfully processed {file_type_msg} file {filename} (saved to {storage_msg}). Found {len(found_skills)} skills: {", ".join(found_skills)}',
                     'skills': found_skills,
-                    'filename': filename
+                    'filename': filename,
+                    'file_type': file_type
                 })
             else:
-                return jsonify({'success': False, 'message': f'Could not extract text from {filename}'})
+                file_type_msg = 'PDF' if file_type == 'pdf' else 'Excel'
+                return jsonify({'success': False, 'message': f'Could not extract text from {file_type_msg} file {filename}'})
                 
         except Exception as e:
             return jsonify({'success': False, 'message': f'Error processing file: {str(e)}'})
     else:
-        return jsonify({'success': False, 'message': 'Please upload a PDF file'})
+        return jsonify({'success': False, 'message': 'Please upload a PDF or Excel file (.pdf, .xlsx, .xls)'})
 
 @app.route('/api/skills')
 def api_skills():
@@ -449,6 +593,43 @@ def api_skills():
         'skills': dict(skill_counter),
         'top_skills': skill_counter.most_common(20)
     })
+
+@app.route('/api/health')
+def health_check():
+    """Health check endpoint with stats information."""
+    stats_loaded = len(skill_counter) > 0 or len(processed_documents) > 0
+    
+    return jsonify({
+        'status': 'healthy',
+        'stats_loaded': stats_loaded,
+        'total_documents': len(processed_documents),
+        'total_skills': len(skill_counter),
+        'azure_blob_available': get_blob_service_client() is not None,
+        'timestamp': datetime.now().isoformat()
+    })
+
+@app.route('/api/reload-stats', methods=['POST'])
+def reload_stats():
+    """Manually reload stats from Azure Blob Storage."""
+    try:
+        success = load_stats_from_blob()
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Stats reloaded successfully',
+                'total_documents': len(processed_documents),
+                'total_skills': len(skill_counter)
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to reload stats from blob storage'
+            })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error reloading stats: {str(e)}'
+        })
 
 @app.route('/skills')
 def skills_page():
@@ -569,8 +750,13 @@ def load_stats_from_blob():
         return False
 
 # Load stats on application startup
-if __name__ != '__main__':  # Only load when running in production
+# Try to load stats when the application starts
+try:
     load_stats_from_blob()
+    print("Application stats loaded successfully on startup")
+except Exception as e:
+    print(f"Failed to load stats on startup: {e}")
+    print("Starting with empty stats")
 
 def upload_file_to_blob(file_content, filename):
     """Upload file to Azure Blob Storage."""
@@ -642,4 +828,4 @@ def get_file_content(filename, is_blob=True):
         return None
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5001)
