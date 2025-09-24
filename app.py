@@ -119,9 +119,11 @@ def save_ai_stats_to_blob():
     try:
         blob_service_client = get_blob_service_client()
         if not blob_service_client:
+            print("Warning: No blob service client available for AI stats save")
             return False
         
         ai_stats_data = ai_extractor.get_ai_stats_data()
+        print(f"Saving AI stats: {len(ai_stats_data.get('ai_skill_counter', {}))} skills, {len(ai_stats_data.get('ai_processed_documents', {}))} documents")
         ai_stats_json = json.dumps(ai_stats_data, indent=2, default=str)
         
         # Upload AI stats to blob storage
@@ -136,6 +138,8 @@ def save_ai_stats_to_blob():
         
     except Exception as e:
         print(f"Error saving AI stats to blob storage: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def load_stats_from_blob():
@@ -204,6 +208,7 @@ def load_ai_stats_from_blob():
     try:
         blob_service_client = get_blob_service_client()
         if not blob_service_client:
+            print("Warning: No blob service client available for AI stats load")
             return False
         
         ai_blob_client = blob_service_client.get_blob_client(
@@ -218,25 +223,43 @@ def load_ai_stats_from_blob():
         ai_stats_content = ai_blob_client.download_blob().readall()
         ai_stats_data = json.loads(ai_stats_content.decode('utf-8'))
         
+        print(f"Loading AI stats from blob: {len(ai_stats_data.get('ai_skill_counter', {}))} skills, {len(ai_stats_data.get('ai_processed_documents', {}))} documents")
+        
         ai_extractor.load_ai_stats_data(ai_stats_data)
         
         print(f"AI stats loaded from blob storage successfully")
         print(f"  AI Documents: {len(ai_extractor.ai_processed_documents)}")
         print(f"  AI Skills: {len(ai_extractor.ai_skill_counter)}")
+        print(f"  Top AI Skills: {ai_extractor.ai_skill_counter.most_common(5)}")
         
         return True
         
     except Exception as e:
         print(f"Error loading AI stats from blob storage: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 # Load stats on application startup
 try:
-    load_stats_from_blob()
-    print("Application stats loaded successfully on startup")
+    stats_loaded = load_stats_from_blob()
+    if stats_loaded:
+        print("Application stats loaded successfully on startup")
+        # Also try to explicitly load AI stats if main stats loading didn't include them
+        if len(ai_extractor.ai_skill_counter) == 0:
+            print("AI stats appear empty, attempting explicit AI stats load...")
+            load_ai_stats_from_blob()
+    else:
+        print("Failed to load main stats, attempting AI stats load only...")
+        load_ai_stats_from_blob()
 except Exception as e:
     print(f"Failed to load stats on startup: {e}")
     print("Starting with empty stats")
+    # Still try to load AI stats independently
+    try:
+        load_ai_stats_from_blob()
+    except Exception as ai_e:
+        print(f"Also failed to load AI stats: {ai_e}")
 
 # Allowed file extensions
 ALLOWED_EXTENSIONS = {'pdf', 'xlsx', 'xls'}
@@ -719,11 +742,20 @@ def api_comparison():
     return jsonify({
         'pattern_matching': {
             'total_skills': len(pattern_skills),
-            'top_skills': skill_counter.most_common(10)
+            'top_skills': skill_counter.most_common(10),
+            'total_documents': len(processed_documents)
         },
         'ai_extraction': {
             'total_skills': len(ai_skills),
-            'top_skills': ai_extractor.ai_skill_counter.most_common(10)
+            'top_skills': ai_extractor.ai_skill_counter.most_common(10),
+            'total_documents': len(ai_extractor.ai_processed_documents),
+            'service_type': ai_extractor.service_type,
+            'model_name': ai_extractor.model_name,
+            'debug_info': {
+                'counter_length': len(ai_extractor.ai_skill_counter),
+                'has_ai_client': ai_extractor.client is not None,
+                'blob_name': ai_extractor.ai_stats_blob_name
+            }
         },
         'comparison': {
             'common_skills': len(pattern_skills.intersection(ai_skills)),
@@ -990,6 +1022,36 @@ def get_file_content(filename, is_blob=True):
     except Exception as e:
         print(f"Error reading local file: {e}")
         return None
+
+@app.route('/api/reload-ai-stats', methods=['POST'])
+def reload_ai_stats():
+    """Manually reload AI stats from blob storage for debugging."""
+    try:
+        success = load_ai_stats_from_blob()
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'AI stats reloaded successfully',
+                'ai_stats': {
+                    'total_documents': len(ai_extractor.ai_processed_documents),
+                    'total_skills': len(ai_extractor.ai_skill_counter),
+                    'top_skills': ai_extractor.ai_skill_counter.most_common(10)
+                }
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to reload AI stats',
+                'ai_stats': {
+                    'total_documents': len(ai_extractor.ai_processed_documents),
+                    'total_skills': len(ai_extractor.ai_skill_counter)
+                }
+            })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error reloading AI stats: {str(e)}'
+        })
 
 @app.route('/api/monthly-analysis')
 def get_monthly_analysis():
