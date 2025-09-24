@@ -862,7 +862,31 @@ def reload_stats():
 def skills_page():
     """Page showing all skill statistics."""
     all_skills = skill_counter.most_common()
-    return render_template('skills.html', skills=all_skills, page_name='skills')
+    all_ai_skills = ai_extractor.ai_skill_counter.most_common()
+    
+    # Create combined skill data with both pattern and AI counts
+    combined_skills = {}
+    
+    # Add pattern matching skills
+    for skill, count in all_skills:
+        combined_skills[skill] = {'pattern_count': count, 'ai_count': 0}
+    
+    # Add AI skills
+    for skill, count in all_ai_skills:
+        if skill in combined_skills:
+            combined_skills[skill]['ai_count'] = count
+        else:
+            combined_skills[skill] = {'pattern_count': 0, 'ai_count': count}
+    
+    # Sort by total occurrences (pattern + AI)
+    sorted_skills = sorted(combined_skills.items(), 
+                          key=lambda x: x[1]['pattern_count'] + x[1]['ai_count'], 
+                          reverse=True)
+    
+    return render_template('skills.html', 
+                         skills=all_skills, 
+                         combined_skills=sorted_skills,
+                         page_name='skills')
 
 @app.route('/ai-skills')
 def ai_skills_page():

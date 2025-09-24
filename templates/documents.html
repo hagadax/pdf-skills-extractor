@@ -112,12 +112,21 @@
             gap: 0.5rem;
         }
         .skill-tag {
-            background: #667eea;
             color: white;
             padding: 0.2rem 0.6rem;
             border-radius: 12px;
             font-size: 0.8rem;
             font-weight: 500;
+            margin: 0.1rem;
+        }
+        .pattern-tag {
+            background: linear-gradient(135deg, #667eea 0%, #5a6fd8 100%);
+        }
+        .ai-tag {
+            background: linear-gradient(135deg, #28a745 0%, #20923a 100%);
+        }
+        .skill-tag:not(.pattern-tag):not(.ai-tag) {
+            background: #667eea;
         }
         .no-documents {
             text-align: center;
@@ -170,7 +179,7 @@
                 
                 <div class="documents-grid" id="documentsGrid">
                     {% for filename, doc_data in documents.items() %}
-                        <div class="document-card" data-filename="{{ filename.lower() }}" data-skills="{{ doc_data.skills_found|join(' ')|lower }}">
+                        <div class="document-card" data-filename="{{ filename.lower() }}" data-skills="{{ doc_data.skills_found|join(' ')|lower }} {{ doc_data.ai_skills_found|join(' ')|lower if doc_data.ai_skills_found else '' }}">
                             <div class="document-name">
                                 {% if doc_data.file_type == 'excel' %}
                                     📊 {{ filename }}
@@ -195,19 +204,38 @@
                                 <div class="info-label">Upload Date:</div>
                                 <div class="info-value">{{ doc_data.upload_date }}</div>
                                 
-                                <div class="info-label">Skills Found:</div>
+                                <div class="info-label">Pattern Skills:</div>
                                 <div class="info-value">{{ doc_data.skills_found|length }}</div>
+                                
+                                <div class="info-label">AI Skills:</div>
+                                <div class="info-value">{{ doc_data.ai_skills_found|length if doc_data.ai_skills_found else 0 }}</div>
+                                
+                                <div class="info-label">Total Skills:</div>
+                                <div class="info-value">{{ (doc_data.skills_found|length) + (doc_data.ai_skills_found|length if doc_data.ai_skills_found else 0) }}</div>
                             </div>
 
-                            {% if doc_data.skills_found %}
-                                <div class="skills-section">
-                                    <div class="skills-header">Extracted Skills:</div>
-                                    <div class="skills-list">
-                                        {% for skill in doc_data.skills_found %}
-                                            <span class="skill-tag">{{ skill }}</span>
-                                        {% endfor %}
+                            {% if doc_data.skills_found or doc_data.ai_skills_found %}
+                                {% if doc_data.skills_found %}
+                                    <div class="skills-section">
+                                        <div class="skills-header">Pattern Matching Skills ({{ doc_data.skills_found|length }}):</div>
+                                        <div class="skills-list">
+                                            {% for skill in doc_data.skills_found %}
+                                                <span class="skill-tag pattern-tag">{{ skill }}</span>
+                                            {% endfor %}
+                                        </div>
                                     </div>
-                                </div>
+                                {% endif %}
+                                
+                                {% if doc_data.ai_skills_found %}
+                                    <div class="skills-section">
+                                        <div class="skills-header">AI Extracted Skills ({{ doc_data.ai_skills_found|length }}):</div>
+                                        <div class="skills-list">
+                                            {% for skill in doc_data.ai_skills_found %}
+                                                <span class="skill-tag ai-tag">{{ skill }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                {% endif %}
                             {% else %}
                                 <div class="skills-section">
                                     <div class="skills-header">No skills found</div>

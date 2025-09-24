@@ -65,30 +65,57 @@
             gap: 1rem;
         }
         .skill-card {
-            background: #f8f9fa;
-            border-radius: 10px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-radius: 12px;
             padding: 1.5rem;
             border-left: 4px solid #667eea;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
         .skill-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
         }
         .skill-name {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             font-weight: 600;
             color: #333;
+            margin-bottom: 1rem;
+        }
+        .skill-stats {
+            display: flex;
+            gap: 1rem;
             margin-bottom: 0.5rem;
         }
-        .skill-count {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #667eea;
+        .stat-item {
+            flex: 1;
+            text-align: center;
+            padding: 0.5rem;
+            border-radius: 8px;
         }
-        .skill-label {
-            color: #6c757d;
+        .pattern-stat {
+            background: linear-gradient(135deg, #667eea 0%, #5a6fd8 100%);
+            color: white;
+        }
+        .ai-stat {
+            background: linear-gradient(135deg, #28a745 0%, #20923a 100%);
+            color: white;
+        }
+        .stat-number {
+            font-size: 1.2rem;
+            font-weight: bold;
+            display: block;
+        }
+        .stat-label {
+            font-size: 0.8rem;
+            opacity: 0.9;
+        }
+        .total-count-display {
+            text-align: center;
+            margin-top: 0.5rem;
             font-size: 0.9rem;
+            color: #6c757d;
+            font-weight: 500;
         }
         .no-skills {
             text-align: center;
@@ -133,18 +160,29 @@
         <div class="skills-container">
             <div class="skills-header">
                 <h2 class="skills-title">Technology Skills</h2>
-                <div class="total-count">{{ skills|length }} Total Skills</div>
+                <div class="total-count">{{ combined_skills|length }} Total Skills</div>
             </div>
 
-            {% if skills %}
+            {% if combined_skills %}
                 <input type="text" id="searchBox" class="search-box" placeholder="Search skills..." onkeyup="filterSkills()">
                 
                 <div class="skills-grid" id="skillsGrid">
-                    {% for skill, count in skills %}
+                    {% for skill, counts in combined_skills %}
                         <div class="skill-card" data-skill="{{ skill.lower() }}">
                             <div class="skill-name">{{ skill }}</div>
-                            <div class="skill-count">{{ count }}</div>
-                            <div class="skill-label">occurrences</div>
+                            <div class="skill-stats">
+                                <div class="stat-item pattern-stat">
+                                    <span class="stat-number">{{ counts.pattern_count }}</span>
+                                    <span class="stat-label">Pattern Match</span>
+                                </div>
+                                <div class="stat-item ai-stat">
+                                    <span class="stat-number">{{ counts.ai_count }}</span>
+                                    <span class="stat-label">AI Extraction</span>
+                                </div>
+                            </div>
+                            <div class="total-count-display">
+                                Total: {{ counts.pattern_count + counts.ai_count }} occurrences
+                            </div>
                         </div>
                     {% endfor %}
                 </div>
