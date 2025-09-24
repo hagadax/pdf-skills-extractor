@@ -167,14 +167,18 @@
             cursor: pointer;
             background: #f8f9fa;
             border: 2px dashed #dee2e6;
-            border-radius: 10px;
-            padding: 2rem;
+            border-radius: 12px;
+            padding: 2.5rem;
             text-align: center;
             transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            min-width: 300px;
         }
         .file-input-wrapper:hover {
             border-color: #667eea;
             background: #f0f2ff;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15);
         }
         .file-input {
             position: absolute;
@@ -327,6 +331,204 @@
                 height: 300px !important;
             }
         }
+        
+        /* New Styles for Redesigned Layout */
+        .skills-comparison-section {
+            margin-bottom: 2rem;
+        }
+        
+        .skills-comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+        
+        .skills-panel {
+            border-left: 4px solid #667eea;
+        }
+        
+        .skills-panel:nth-child(2) {
+            border-left-color: #28a745;
+        }
+        
+        .skills-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        
+        .skills-header h3 {
+            color: #333;
+            margin: 0;
+            font-size: 1.3rem;
+        }
+        
+        .skills-stats {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .stat-badge {
+            background: #f8f9fa;
+            color: #495057;
+            padding: 0.25rem 0.75rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            border: 1px solid #e9ecef;
+        }
+        
+        .no-skills-msg {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 2rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin: 0;
+        }
+        
+        .upload-section-central {
+            margin: 3rem auto;
+            text-align: center;
+            background: white;
+            border-radius: 15px;
+            position: relative;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .upload-section-central::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: transparent;
+            border-radius: 15px;
+            z-index: -1;
+        }
+        
+        .upload-section-central:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+        }
+        
+        .upload-section-central h2 {
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-size: 1.8rem;
+        }
+        
+        .upload-description {
+            color: #6c757d;
+            margin-bottom: 1.5rem;
+            font-size: 1rem;
+        }
+        
+        .chart-section {
+            margin-top: 2rem;
+        }
+        
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        
+        .chart-header h2 {
+            margin: 0;
+            color: #333;
+            font-size: 1.5rem;
+        }
+        
+        .chart-toggle {
+            display: flex;
+            gap: 0.5rem;
+            background: transparent;
+            border-radius: 8px;
+        }
+        
+        .toggle-btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            background: transparent;
+            color: #333;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border-radius: 8px;
+            margin: 0 0.25rem;
+        }
+        
+        .toggle-btn:last-child {
+            border-right: none;
+        }
+        
+        .toggle-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .toggle-btn:hover:not(.active) {
+            background: #667eea;
+            color: white;
+        }
+        
+        .chart-description {
+            color: #6c757d;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+        }
+        
+        /* Mobile Responsive Updates */
+        @media (max-width: 768px) {
+            .skills-comparison-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .skills-header {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .chart-header {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .chart-toggle {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .toggle-btn {
+                flex: 1;
+                text-align: center;
+            }
+            
+            .chart-container {
+                height: 300px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -344,7 +546,7 @@
     <div class="container">
         <div class="header">
             <h1>PDF & Excel Skills Extractor</h1>
-            <p>Upload PDF or Excel documents to extract and track technology skills</p>
+            <p>Upload PDF or Excel documents to extract and track technology skills using AI and Pattern Matching</p>
         </div>
 
         {% with messages = get_flashed_messages() %}
@@ -357,68 +559,96 @@
             {% endif %}
         {% endwith %}
 
-        <!-- Chart Section moved above main content -->
-        {% if chart_data.datasets %}
-        <div class="card chart-section" style="margin-bottom: 2rem;">
-            <h2>Skills Trend - Last 12 Months</h2>
-            <p style="color: #6c757d; margin-bottom: 1rem; font-size: 0.9rem;">
-                Monthly occurrence of top 10 skills based on document upload/creation dates
+        <!-- Chart Section with Toggle - Moved to Top -->
+        {% if pattern_chart_data.datasets or ai_chart_data.datasets %}
+        <div class="card chart-section">
+            <div class="chart-header">
+                <h2>📊 Skills Trend - Last 12 Months</h2>
+                <div class="chart-toggle">
+                    <button class="toggle-btn active" data-chart="pattern" id="patternToggle">
+                        🔍 Pattern Matching
+                    </button>
+                    <button class="toggle-btn" data-chart="ai" id="aiToggle">
+                        🤖 AI Extraction
+                    </button>
+                </div>
+            </div>
+            <p class="chart-description">
+                <span id="chartDescription">Monthly occurrence of top skills from pattern matching based on document dates</span>
             </p>
-            <div style="position: relative; height: 400px;">
+            <div class="chart-container">
                 <canvas id="skillsChart"></canvas>
             </div>
         </div>
         {% endif %}
 
-        <div class="main-content">
-            <div class="card upload-section">
-                <h2>Upload PDF Document</h2>
-                <form id="uploadForm" enctype="multipart/form-data" class="upload-form">
-                    <div class="file-input-wrapper">
-                        <input type="file" name="file" accept=".pdf,.xlsx,.xls" class="file-input" id="fileInput" required>
-                        <div class="file-input-text">
-                            <strong>Click to select a PDF or Excel file</strong><br>
-                            <small>Maximum file size: 16MB</small>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn-upload" id="uploadBtn">Extract Skills</button>
-                </form>
-            </div>
-
-            <div class="card stats-section">
-                <h2>Statistics</h2>
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <div class="stat-number">{{ total_documents }}</div>
-                        <div class="stat-label">Documents</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number">{{ total_skills }}</div>
-                        <div class="stat-label">Unique Skills</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number">{{ top_skills|length }}</div>
-                        <div class="stat-label">Top Skills</div>
+        <!-- Upload Section - Above Stats -->
+        <div class="card upload-section-central">
+            <h2>📄 Upload Document</h2>
+            <p class="upload-description">Upload PDF or Excel files to extract skills using both AI and pattern matching</p>
+            <form id="uploadForm" enctype="multipart/form-data" class="upload-form">
+                <div class="file-input-wrapper">
+                    <input type="file" name="file" accept=".pdf,.xlsx,.xls" class="file-input" id="fileInput" required>
+                    <div class="file-input-text">
+                        <strong>Click to select a PDF or Excel file</strong><br>
+                        <small>Maximum file size: 16MB</small>
                     </div>
                 </div>
+                <button type="submit" class="btn-upload" id="uploadBtn">Extract Skills</button>
+            </form>
+        </div>
 
-                {% if top_skills %}
-                    <h3>Top Skills</h3>
-                    <div class="skills-list">
-                        {% for skill, count in top_skills %}
-                            <div class="skill-item">
-                                <span class="skill-name">{{ skill }}</span>
-                                <span class="skill-count">{{ count }}</span>
-                            </div>
-                        {% endfor %}
+        <!-- Top Skills Section - Side by Side -->
+        <div class="skills-comparison-section">
+            <div class="skills-comparison-grid">
+                <!-- Pattern Matching Skills -->
+                <div class="card skills-panel">
+                    <div class="skills-header">
+                        <h3>🔍 Pattern Matching Skills</h3>
+                        <div class="skills-stats">
+                            <span class="stat-badge">{{ total_skills }} unique skills</span>
+                            <span class="stat-badge">{{ total_documents }} documents</span>
+                        </div>
                     </div>
-                {% else %}
-                    <p style="text-align: center; color: #6c757d; margin-top: 2rem;">
-                        No skills extracted yet. Upload a PDF to get started!
-                    </p>
-                {% endif %}
+                    {% if top_skills %}
+                        <div class="skills-list">
+                            {% for skill, count in top_skills %}
+                                <div class="skill-item">
+                                    <span class="skill-name">{{ skill }}</span>
+                                    <span class="skill-count">{{ count }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="no-skills-msg">No skills extracted yet</p>
+                    {% endif %}
+                </div>
+
+                <!-- AI Extraction Skills -->
+                <div class="card skills-panel">
+                    <div class="skills-header">
+                        <h3>🤖 AI Extraction Skills</h3>
+                        <div class="skills-stats">
+                            <span class="stat-badge">{{ total_ai_skills }} unique skills</span>
+                            <span class="stat-badge">{{ total_ai_documents }} documents</span>
+                        </div>
+                    </div>
+                    {% if top_ai_skills %}
+                        <div class="skills-list">
+                            {% for skill, count in top_ai_skills %}
+                                <div class="skill-item">
+                                    <span class="skill-name">{{ skill }}</span>
+                                    <span class="skill-count">{{ count }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="no-skills-msg">No AI skills extracted yet</p>
+                    {% endif %}
+                </div>
             </div>
         </div>
+
     </div>
 
     <!-- Chart.js Library -->
@@ -478,100 +708,160 @@
             }
         });
 
-        // Initialize Skills Chart
-        {% if chart_data.datasets %}
-        const ctx = document.getElementById('skillsChart').getContext('2d');
-        const skillsChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: {{ chart_data.labels | tojson }},
-                datasets: {{ chart_data.datasets | tojson }}
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Skills Growth Over Time (Cumulative)',
-                        font: {
-                            size: 16,
-                            weight: 'bold'
-                        },
-                        color: '#333'
-                    },
-                    legend: {
-                        display: true,
-                        position: 'bottom',
-                        labels: {
-                            usePointStyle: true,
-                            padding: 15,
-                            font: {
-                                size: 11
-                            }
-                        }
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        titleColor: 'white',
-                        bodyColor: 'white',
-                        borderColor: '#667eea',
-                        borderWidth: 1
-                    }
+        // Chart data from backend
+        const patternChartData = {{ pattern_chart_data | tojson }};
+        const aiChartData = {{ ai_chart_data | tojson }};
+
+        let skillsChart = null;
+        let currentChartType = 'pattern';
+
+        // Initialize Charts
+        {% if pattern_chart_data.datasets or ai_chart_data.datasets %}
+        function initializeChart(chartData, type) {
+            const ctx = document.getElementById('skillsChart').getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (skillsChart) {
+                skillsChart.destroy();
+            }
+
+            const title = type === 'pattern' ? 
+                'Skills Growth Over Time - Pattern Matching (Cumulative)' : 
+                'Skills Growth Over Time - AI Extraction (Cumulative)';
+
+            skillsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.labels || [],
+                    datasets: chartData.datasets || []
                 },
-                scales: {
-                    x: {
-                        display: true,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
                         title: {
                             display: true,
-                            text: 'Month',
-                            color: '#666',
+                            text: title,
                             font: {
-                                size: 12,
+                                size: 16,
                                 weight: 'bold'
-                            }
+                            },
+                            color: '#333'
                         },
-                        grid: {
-                            color: 'rgba(0, 0, 0, 0.1)'
-                        }
-                    },
-                    y: {
-                        display: true,
-                        title: {
+                        legend: {
                             display: true,
-                            text: 'Cumulative Skill Count',
-                            color: '#666',
-                            font: {
-                                size: 12,
-                                weight: 'bold'
+                            position: 'bottom',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 15,
+                                font: {
+                                    size: 11
+                                }
                             }
                         },
-                        beginAtZero: true,
-                        grid: {
-                            color: 'rgba(0, 0, 0, 0.1)'
-                        },
-                        ticks: {
-                            stepSize: 1
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: 'white',
+                            bodyColor: 'white',
+                            borderColor: type === 'pattern' ? '#667eea' : '#28a745',
+                            borderWidth: 1
                         }
-                    }
-                },
-                elements: {
-                    point: {
-                        radius: 4,
-                        hoverRadius: 6
                     },
-                    line: {
-                        borderWidth: 2
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Month',
+                                color: '#666',
+                                font: {
+                                    size: 12,
+                                    weight: 'bold'
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Cumulative Skill Count',
+                                color: '#666',
+                                font: {
+                                    size: 12,
+                                    weight: 'bold'
+                                }
+                            },
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            },
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    },
+                    elements: {
+                        point: {
+                            radius: 4,
+                            hoverRadius: 6
+                        },
+                        line: {
+                            borderWidth: 2
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
                     }
-                },
-                interaction: {
-                    mode: 'nearest',
-                    axis: 'x',
-                    intersect: false
+                }
+            });
+        }
+
+        // Chart toggle functionality
+        function toggleChart(type) {
+            const patternToggle = document.getElementById('patternToggle');
+            const aiToggle = document.getElementById('aiToggle');
+            const description = document.getElementById('chartDescription');
+
+            // Update button states
+            patternToggle.classList.remove('active');
+            aiToggle.classList.remove('active');
+
+            if (type === 'pattern') {
+                patternToggle.classList.add('active');
+                description.textContent = 'Monthly occurrence of top skills from pattern matching based on document dates';
+                if (patternChartData.datasets && patternChartData.datasets.length > 0) {
+                    initializeChart(patternChartData, 'pattern');
+                } else {
+                    // Show empty chart message for pattern
+                    initializeChart({labels: [], datasets: []}, 'pattern');
+                }
+            } else {
+                aiToggle.classList.add('active');
+                description.textContent = 'Monthly occurrence of top skills from AI extraction based on document dates';
+                if (aiChartData.datasets && aiChartData.datasets.length > 0) {
+                    initializeChart(aiChartData, 'ai');
+                } else {
+                    // Show empty chart message for AI
+                    initializeChart({labels: [], datasets: []}, 'ai');
                 }
             }
+            currentChartType = type;
+        }
+
+        // Initialize with pattern matching data by default
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleChart('pattern');
+
+            // Add event listeners to toggle buttons
+            document.getElementById('patternToggle')?.addEventListener('click', () => toggleChart('pattern'));
+            document.getElementById('aiToggle')?.addEventListener('click', () => toggleChart('ai'));
         });
         {% endif %}
     </script>

@@ -603,18 +603,30 @@ def get_monthly_chart_data():
 @app.route('/')
 def index():
     """Main page with upload form and skill statistics."""
-    # Get top 10 most common skills
+    # Get top 10 most common skills from pattern matching
     top_skills = skill_counter.most_common(10)
-    total_documents = len(processed_documents)
     
-    # Get chart data for visualization
-    chart_data = get_monthly_chart_data()
+    # Get top 10 most common AI skills
+    top_ai_skills = ai_extractor.ai_skill_counter.most_common(10)
+    
+    total_documents = len(processed_documents)
+    total_ai_documents = len(ai_extractor.ai_processed_documents)
+    
+    # Get chart data for visualization (pattern matching)
+    pattern_chart_data = get_monthly_chart_data()
+    
+    # Get AI chart data for visualization
+    ai_chart_data = ai_extractor.get_ai_monthly_chart_data()
     
     return render_template('index.html', 
                          top_skills=top_skills, 
+                         top_ai_skills=top_ai_skills,
                          total_documents=total_documents,
+                         total_ai_documents=total_ai_documents,
                          total_skills=len(skill_counter),
-                         chart_data=chart_data,
+                         total_ai_skills=len(ai_extractor.ai_skill_counter),
+                         pattern_chart_data=pattern_chart_data,
+                         ai_chart_data=ai_chart_data,
                          page_name='home')
 
 @app.route('/upload', methods=['POST'])
@@ -869,11 +881,30 @@ def comparison_page():
     pattern_chart_data = get_monthly_chart_data()
     ai_chart_data = ai_extractor.get_ai_monthly_chart_data()
     
+    # Calculate comparison statistics
+    pattern_skill_names = set([skill for skill, count in pattern_skills])
+    ai_skill_names = set([skill for skill, count in ai_skills])
+    
+    # Get all skills from both methods (not just top 20)
+    all_pattern_skills = set([skill for skill, count in skill_counter.most_common()])
+    all_ai_skills = set([skill for skill, count in ai_extractor.ai_skill_counter.most_common()])
+    
+    # Calculate overlap and unique skills
+    common_skills = all_pattern_skills & all_ai_skills
+    unique_pattern_skills = list(all_pattern_skills - all_ai_skills)
+    unique_ai_skills = list(all_ai_skills - all_pattern_skills)
+    total_unique = len(all_pattern_skills | all_ai_skills)
+    overlap_count = len(common_skills)
+    
     return render_template('comparison.html', 
                          pattern_skills=pattern_skills,
                          ai_skills=ai_skills,
                          pattern_chart_data=pattern_chart_data,
                          ai_chart_data=ai_chart_data,
+                         overlap_count=overlap_count,
+                         total_unique=total_unique,
+                         unique_pattern_skills=unique_pattern_skills,
+                         unique_ai_skills=unique_ai_skills,
                          page_name='comparison')
 
 @app.route('/skill-details')
