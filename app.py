@@ -1326,14 +1326,114 @@ def generate_monthly_analysis():
             'message': f'Error generating monthly analysis: {str(e)}'
         })
 
+@app.route('/api/monthly-analysis/historical')
+def get_historical_monthly_reports():
+    """Get index of all historical monthly reports."""
+    try:
+        historical_data = monthly_analyzer.get_historical_reports()
+        
+        return jsonify({
+            'success': True,
+            'historical_data': historical_data
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error retrieving historical reports: {str(e)}'
+        })
+
+@app.route('/api/monthly-analysis/<month>')
+def get_monthly_report_by_month(month):
+    """Get a specific monthly report by month (YYYY-MM format)."""
+    try:
+        # Validate month format
+        if not month or len(month) != 7 or month[4] != '-':
+            return jsonify({
+                'success': False,
+                'message': 'Invalid month format. Use YYYY-MM format (e.g., 2025-09)'
+            }), 400
+        
+        report = monthly_analyzer.get_report_by_month(month)
+        
+        if report:
+            return jsonify({
+                'success': True,
+                'report': report
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': f'No report found for {month}'
+            }), 404
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error retrieving report for {month}: {str(e)}'
+        })
+
+@app.route('/api/monthly-analysis/compare', methods=['POST'])
+def compare_monthly_reports():
+    """Compare multiple monthly reports."""
+    try:
+        data = request.get_json()
+        months = data.get('months', [])
+        
+        if not months or len(months) < 2:
+            return jsonify({
+                'success': False,
+                'message': 'Please provide at least 2 months for comparison'
+            }), 400
+        
+        comparison = monthly_analyzer.get_comparative_analysis(months)
+        
+        return jsonify({
+            'success': True,
+            'comparison': comparison
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error generating comparison: {str(e)}'
+        })
+
 @app.route('/monthly-dashboard')
 def monthly_dashboard():
     """Display monthly analysis dashboard."""
     try:
         latest_report = monthly_analyzer.get_latest_report()
-        return render_template('monthly_dashboard.html', report=latest_report)
+        historical_data = monthly_analyzer.get_historical_reports()
+        
+        return render_template('monthly_dashboard.html', 
+                             report=latest_report, 
+                             historical_data=historical_data)
     except Exception as e:
         return render_template('monthly_dashboard.html', error=str(e))
+
+@app.route('/debug/monthly-reports')
+def debug_monthly_reports():
+    """Debug endpoint to view monthly reports status."""
+    try:
+        historical_data = monthly_analyzer.get_historical_reports()
+        latest_report = monthly_analyzer.get_latest_report()
+        
+        debug_info = {
+            'historical_summary': {
+                'total_reports': historical_data.get('total_reports', 0),
+                'months_available': historical_data.get('months_available', [])
+            },
+            'latest_report_month': latest_report.get('analysis_month', 'None'),
+            'latest_report_documents': latest_report.get('total_documents', 0),
+            'azure_storage_container': monthly_analyzer.reports_container,
+            'blob_prefix': monthly_analyzer.reports_blob_prefix,
+            'historical_index_blob': monthly_analyzer.historical_index_blob
+        }
+        
+        return jsonify(debug_info)
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'debug_info': 'Failed to load monthly reports debug information'
+        })
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

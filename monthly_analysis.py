@@ -13,6 +13,8 @@ from collections import Counter, defaultdict
 from typing import Dict, List, Any, Tuple
 import logging
 from dataclasses import dataclass, asdict
+from azure.storage.blob import BlobServiceClient
+from azure.identity import DefaultAzureCredential
 
 # Import existing modules
 from ai_skills import ai_extractor
@@ -68,6 +70,129 @@ class MonthlySkillsAnalyzer:
             'data_science': ['pandas', 'numpy', 'tensorflow', 'pytorch', 'scikit-learn', 'spark'],
             'devops': ['jenkins', 'git', 'ci/cd', 'ansible', 'helm', 'prometheus']
         }
+        
+        # Azure Blob Storage configuration for monthly reports
+        self.reports_container = 'monthly-reports'
+        self.reports_blob_prefix = 'monthly_analysis_'
+        self.historical_index_blob = 'historical_reports_index.json'
+    
+    def _get_blob_service_client(self):
+        """Get Azure Blob Service Client for monthly reports storage."""
+        try:
+            # Try to get connection string from environment or Key Vault
+            connection_string = os.environ.get('AZURE_STORAGE_CONNECTION_STRING')
+            if connection_string:
+                return BlobServiceClient.from_connection_string(connection_string)
+            else:
+                # Use Managed Identity
+                credential = DefaultAzureCredential()
+                account_url = f"https://{os.environ.get('AZURE_STORAGE_ACCOUNT_NAME')}.blob.core.windows.net"
+                return BlobServiceClient(account_url=account_url, credential=credential)
+        except Exception as e:
+            logger.error(f"Error initializing blob service client for monthly reports: {e}")
+            return None
+    
+    def _ensure_reports_container(self):
+        """Ensure the monthly reports container exists."""
+        try:
+            blob_service_client = self._get_blob_service_client()
+            if blob_service_client:
+                blob_service_client.create_container(self.reports_container)
+                logger.info(f"Monthly reports container '{self.reports_container}' ready")
+        except Exception as e:
+            if "ContainerAlreadyExists" not in str(e):
+                logger.error(f"Error creating monthly reports container: {e}")
+    
+    def _save_report_to_blob(self, report: 'MonthlyAnalysisReport'):
+        """Save monthly report to Azure Blob Storage."""
+        try:
+            self._ensure_reports_container()
+            blob_service_client = self._get_blob_service_client()
+            
+            if not blob_service_client:
+                logger.warning("Azure Blob Storage not available, falling back to local storage")
+                return self._save_monthly_report_local(report)
+            
+            # Convert to dictionary
+            report_dict = asdict(report)
+            report_json = json.dumps(report_dict, indent=2, default=str)
+            
+            # Save individual report
+            blob_name = f"{self.reports_blob_prefix}{report.analysis_month}.json"
+            blob_client = blob_service_client.get_blob_client(
+                container=self.reports_container, 
+                blob=blob_name
+            )
+            blob_client.upload_blob(report_json, overwrite=True)
+            
+            # Update historical index
+            self._update_historical_index(report)
+            
+            logger.info(f"Monthly report saved to blob storage: {blob_name}")
+            
+        except Exception as e:
+            logger.error(f"Failed to save monthly report to blob: {e}")
+            # Fallback to local storage
+            self._save_monthly_report_local(report)
+    
+    def _update_historical_index(self, report: 'MonthlyAnalysisReport'):
+        """Update the historical reports index."""
+        try:
+            blob_service_client = self._get_blob_service_client()
+            if not blob_service_client:
+                return
+            
+            blob_client = blob_service_client.get_blob_client(
+                container=self.reports_container,
+                blob=self.historical_index_blob
+            )
+            
+            # Try to get existing index
+            historical_index = {}
+            try:
+                existing_data = blob_client.download_blob().readall()
+                historical_index = json.loads(existing_data.decode('utf-8'))
+            except Exception:
+                logger.info("Creating new historical reports index")
+            
+            # Add/update this month's entry
+            historical_index[report.analysis_month] = {
+                'analysis_month': report.analysis_month,
+                'total_documents': report.total_documents,
+                'total_resumes': report.total_resumes,
+                'total_job_descriptions': report.total_job_descriptions,
+                'top_skills_count': len(report.top_technical_skills),
+                'generated_at': report.generated_at,
+                'blob_name': f"{self.reports_blob_prefix}{report.analysis_month}.json"
+            }
+            
+            # Save updated index
+            index_json = json.dumps(historical_index, indent=2, default=str)
+            blob_client.upload_blob(index_json, overwrite=True)
+            
+            logger.info(f"Historical index updated for {report.analysis_month}")
+            
+        except Exception as e:
+            logger.error(f"Failed to update historical index: {e}")
+    
+    def _save_monthly_report_local(self, report: 'MonthlyAnalysisReport'):
+        """Fallback method to save monthly report locally."""
+        try:
+            # Convert to dictionary
+            report_dict = asdict(report)
+            
+            # Save to local file (fallback)
+            reports_dir = "monthly_reports"
+            os.makedirs(reports_dir, exist_ok=True)
+            
+            filename = f"{reports_dir}/monthly_analysis_{report.analysis_month}.json"
+            with open(filename, 'w') as f:
+                json.dump(report_dict, f, indent=2, default=str)
+            
+            logger.info(f"Monthly report saved locally: {filename}")
+            
+        except Exception as e:
+            logger.error(f"Failed to save monthly report locally: {e}")
     
     def generate_monthly_report(self, target_month: str = None) -> MonthlyAnalysisReport:
         """
@@ -350,27 +475,55 @@ class MonthlySkillsAnalyzer:
         last_day = next_month - timedelta(days=1)
         return last_day.strftime('%Y-%m-%d')
     
-    def _save_monthly_report(self, report: MonthlyAnalysisReport):
-        """Save the monthly report to storage."""
-        try:
-            # Convert to dictionary
-            report_dict = asdict(report)
-            
-            # Save to local file (in production, this would go to Azure Storage)
-            reports_dir = "monthly_reports"
-            os.makedirs(reports_dir, exist_ok=True)
-            
-            filename = f"{reports_dir}/monthly_analysis_{report.analysis_month}.json"
-            with open(filename, 'w') as f:
-                json.dump(report_dict, f, indent=2, default=str)
-            
-            logger.info(f"Monthly report saved to {filename}")
-            
-        except Exception as e:
-            logger.error(f"Failed to save monthly report: {e}")
+    def _save_monthly_report(self, report: 'MonthlyAnalysisReport'):
+        """Save the monthly report to Azure Blob Storage."""
+        self._save_report_to_blob(report)
     
     def get_latest_report(self) -> Dict[str, Any]:
-        """Get the most recent monthly report."""
+        """Get the most recent monthly report from Azure Blob Storage."""
+        try:
+            blob_service_client = self._get_blob_service_client()
+            
+            if not blob_service_client:
+                logger.warning("Azure Blob Storage not available, trying local storage")
+                return self._get_latest_report_local()
+            
+            # Get historical index to find the latest report
+            blob_client = blob_service_client.get_blob_client(
+                container=self.reports_container,
+                blob=self.historical_index_blob
+            )
+            
+            try:
+                index_data = blob_client.download_blob().readall()
+                historical_index = json.loads(index_data.decode('utf-8'))
+                
+                if not historical_index:
+                    return {}
+                
+                # Find the most recent report
+                latest_month = max(historical_index.keys())
+                latest_info = historical_index[latest_month]
+                
+                # Download the latest report
+                report_blob_client = blob_service_client.get_blob_client(
+                    container=self.reports_container,
+                    blob=latest_info['blob_name']
+                )
+                
+                report_data = report_blob_client.download_blob().readall()
+                return json.loads(report_data.decode('utf-8'))
+                
+            except Exception as e:
+                logger.error(f"Error reading from blob storage: {e}")
+                return self._get_latest_report_local()
+                
+        except Exception as e:
+            logger.error(f"Failed to load latest report from blob: {e}")
+            return self._get_latest_report_local()
+    
+    def _get_latest_report_local(self) -> Dict[str, Any]:
+        """Fallback method to get latest report from local storage."""
         try:
             reports_dir = "monthly_reports"
             if not os.path.exists(reports_dir):
@@ -386,8 +539,130 @@ class MonthlySkillsAnalyzer:
                 return json.load(f)
                 
         except Exception as e:
-            logger.error(f"Failed to load latest report: {e}")
+            logger.error(f"Failed to load latest report locally: {e}")
             return {}
+    
+    def get_historical_reports(self) -> Dict[str, Any]:
+        """Get index of all historical monthly reports."""
+        try:
+            blob_service_client = self._get_blob_service_client()
+            
+            if not blob_service_client:
+                logger.warning("Azure Blob Storage not available")
+                return {}
+            
+            blob_client = blob_service_client.get_blob_client(
+                container=self.reports_container,
+                blob=self.historical_index_blob
+            )
+            
+            try:
+                index_data = blob_client.download_blob().readall()
+                historical_index = json.loads(index_data.decode('utf-8'))
+                
+                # Sort by month descending (newest first)
+                sorted_months = sorted(historical_index.keys(), reverse=True)
+                sorted_index = {month: historical_index[month] for month in sorted_months}
+                
+                return {
+                    'total_reports': len(sorted_index),
+                    'reports': sorted_index,
+                    'months_available': sorted_months
+                }
+                
+            except Exception as e:
+                logger.error(f"Error reading historical index: {e}")
+                return {}
+                
+        except Exception as e:
+            logger.error(f"Failed to load historical reports: {e}")
+            return {}
+    
+    def get_report_by_month(self, target_month: str) -> Dict[str, Any]:
+        """Get a specific monthly report by month (YYYY-MM format)."""
+        try:
+            blob_service_client = self._get_blob_service_client()
+            
+            if not blob_service_client:
+                logger.warning("Azure Blob Storage not available")
+                return {}
+            
+            # Download the specific report
+            blob_name = f"{self.reports_blob_prefix}{target_month}.json"
+            blob_client = blob_service_client.get_blob_client(
+                container=self.reports_container,
+                blob=blob_name
+            )
+            
+            report_data = blob_client.download_blob().readall()
+            return json.loads(report_data.decode('utf-8'))
+                
+        except Exception as e:
+            logger.error(f"Failed to load report for {target_month}: {e}")
+            return {}
+    
+    def get_comparative_analysis(self, months: List[str]) -> Dict[str, Any]:
+        """Get comparative analysis across multiple months."""
+        try:
+            reports = {}
+            
+            # Get reports for all requested months
+            for month in months:
+                report = self.get_report_by_month(month)
+                if report:
+                    reports[month] = report
+            
+            if len(reports) < 2:
+                return {"error": "Need at least 2 months of data for comparison"}
+            
+            # Perform comparative analysis
+            comparison = {
+                'months_analyzed': list(reports.keys()),
+                'document_trends': {},
+                'skill_trends': {},
+                'summary': {}
+            }
+            
+            # Analyze document trends
+            for month, report in reports.items():
+                comparison['document_trends'][month] = {
+                    'total_documents': report.get('total_documents', 0),
+                    'resumes': report.get('total_resumes', 0),
+                    'job_descriptions': report.get('total_job_descriptions', 0)
+                }
+            
+            # Analyze top skills trends
+            skill_evolution = {}
+            for month, report in reports.items():
+                for skill_info in report.get('top_technical_skills', [])[:10]:
+                    skill_name = skill_info.get('skill', '')
+                    skill_count = skill_info.get('count', 0)
+                    
+                    if skill_name not in skill_evolution:
+                        skill_evolution[skill_name] = {}
+                    skill_evolution[skill_name][month] = skill_count
+            
+            comparison['skill_trends'] = skill_evolution
+            
+            # Generate summary insights
+            months_sorted = sorted(reports.keys())
+            if len(months_sorted) >= 2:
+                latest = reports[months_sorted[-1]]
+                previous = reports[months_sorted[-2]]
+                
+                doc_change = latest.get('total_documents', 0) - previous.get('total_documents', 0)
+                comparison['summary'] = {
+                    'latest_month': months_sorted[-1],
+                    'previous_month': months_sorted[-2],
+                    'document_change': doc_change,
+                    'trend_direction': 'increasing' if doc_change > 0 else 'decreasing' if doc_change < 0 else 'stable'
+                }
+            
+            return comparison
+            
+        except Exception as e:
+            logger.error(f"Failed to generate comparative analysis: {e}")
+            return {"error": str(e)}
     
     def schedule_monthly_analysis(self):
         """

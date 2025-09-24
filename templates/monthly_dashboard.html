@@ -208,6 +208,88 @@
         </div>
         {% endif %}
 
+        <!-- Historical Analysis Section -->
+        {% if historical_data and historical_data.reports %}
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <h5><i class="fas fa-history me-2"></i>Historical Analysis</h5>
+                        <small>{{ historical_data.total_reports }} reports available</small>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-light btn-sm" onclick="showComparison()">
+                            <i class="fas fa-balance-scale me-1"></i>Compare Months
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-lg-8">
+                        <h6 class="text-primary mb-3">Monthly Trends</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Month</th>
+                                        <th>Documents</th>
+                                        <th>Resumes</th>
+                                        <th>Job Descriptions</th>
+                                        <th>Skills</th>
+                                        <th>Generated</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for month, data in historical_data.reports.items() %}
+                                    <tr {% if month == report.analysis_month %}class="table-primary"{% endif %}>
+                                        <td>
+                                            <strong>{{ month }}</strong>
+                                            {% if month == report.analysis_month %}
+                                                <span class="badge bg-success">Current</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ data.total_documents }}</td>
+                                        <td>{{ data.total_resumes }}</td>
+                                        <td>{{ data.total_job_descriptions }}</td>
+                                        <td>{{ data.top_skills_count }}</td>
+                                        <td>
+                                            <small>{{ data.generated_at[:10] }}</small>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-outline-primary btn-sm" onclick="viewReport('{{ month }}')">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <h6 class="text-success mb-3">Quick Stats</h6>
+                        <div class="list-group list-group-flush">
+                            <div class="list-group-item d-flex justify-content-between">
+                                <span>Total Historical Reports:</span>
+                                <strong>{{ historical_data.total_reports }}</strong>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between">
+                                <span>Oldest Report:</span>
+                                <strong>{{ historical_data.months_available[-1] if historical_data.months_available }}</strong>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between">
+                                <span>Latest Report:</span>
+                                <strong>{{ historical_data.months_available[0] if historical_data.months_available }}</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Recommendations -->
         {% if report.recommendations %}
         <div class="card mb-4">
@@ -314,6 +396,242 @@
             } finally {
                 modal.hide();
             }
+        }
+        
+        async function viewReport(month) {
+            try {
+                const response = await fetch(`/api/monthly-analysis/${month}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Create a detailed modal to show the report
+                    showReportModal(result.report);
+                } else {
+                    alert('Error loading report: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error loading report: ' + error.message);
+            }
+        }
+        
+        function showReportModal(report) {
+            // Create modal HTML
+            const modalHtml = `
+                <div class="modal fade" id="reportModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Monthly Report - ${report.analysis_month}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-3 text-center">
+                                        <h4 class="text-primary">${report.total_documents}</h4>
+                                        <small>Documents</small>
+                                    </div>
+                                    <div class="col-md-3 text-center">
+                                        <h4 class="text-success">${report.total_resumes}</h4>
+                                        <small>Resumes</small>
+                                    </div>
+                                    <div class="col-md-3 text-center">
+                                        <h4 class="text-info">${report.total_job_descriptions}</h4>
+                                        <small>Job Descriptions</small>
+                                    </div>
+                                    <div class="col-md-3 text-center">
+                                        <h4 class="text-warning">${report.top_technical_skills ? report.top_technical_skills.length : 0}</h4>
+                                        <small>Top Skills</small>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Top Technical Skills</h6>
+                                        <div class="skills-list" style="max-height: 200px; overflow-y: auto;">
+                                            ${report.top_technical_skills ? report.top_technical_skills.slice(0, 10).map(skill => 
+                                                `<span class="badge bg-primary me-1 mb-1">${skill.skill} (${skill.count})</span>`
+                                            ).join('') : 'No skills data'}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Top Soft Skills</h6>
+                                        <div class="skills-list" style="max-height: 200px; overflow-y: auto;">
+                                            ${report.top_soft_skills ? report.top_soft_skills.slice(0, 10).map(skill => 
+                                                `<span class="badge bg-success me-1 mb-1">${skill.skill} (${skill.count})</span>`
+                                            ).join('') : 'No skills data'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove existing modal if any
+            const existingModal = document.getElementById('reportModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Add to body and show
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('reportModal'));
+            modal.show();
+            
+            // Clean up when modal is hidden
+            document.getElementById('reportModal').addEventListener('hidden.bs.modal', function () {
+                this.remove();
+            });
+        }
+        
+        function showComparison() {
+            // Get months from the historical data
+            const monthsAvailable = [
+                {% if historical_data and historical_data.months_available %}
+                {% for month in historical_data.months_available %}
+                '{{ month }}'{% if not loop.last %},{% endif %}
+                {% endfor %}
+                {% endif %}
+            ];
+            
+            let monthsCheckboxes = '';
+            monthsAvailable.forEach(month => {
+                monthsCheckboxes += `
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="month-${month}" value="${month}">
+                        <label class="form-check-label" for="month-${month}">${month}</label>
+                    </div>
+                `;
+            });
+            
+            const modalHtml = `
+                <div class="modal fade" id="comparisonModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Compare Monthly Reports</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>Select 2 or more months to compare:</p>
+                                <div id="monthsSelection">
+                                    ${monthsCheckboxes || '<p class="text-muted">No historical data available</p>'}
+                                </div>
+                                <div id="comparisonResults" class="mt-3"></div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-primary" onclick="performComparison()">Compare</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove existing modal if any
+            const existingModal = document.getElementById('comparisonModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Add to body and show
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('comparisonModal'));
+            modal.show();
+            
+            // Clean up when modal is hidden
+            document.getElementById('comparisonModal').addEventListener('hidden.bs.modal', function () {
+                this.remove();
+            });
+        }
+        
+        async function performComparison() {
+            const checkboxes = document.querySelectorAll('#monthsSelection input[type="checkbox"]:checked');
+            const selectedMonths = Array.from(checkboxes).map(cb => cb.value);
+            
+            if (selectedMonths.length < 2) {
+                alert('Please select at least 2 months to compare');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/monthly-analysis/compare', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ months: selectedMonths })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayComparisonResults(result.comparison);
+                } else {
+                    alert('Error generating comparison: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error generating comparison: ' + error.message);
+            }
+        }
+        
+        function displayComparisonResults(comparison) {
+            const resultsDiv = document.getElementById('comparisonResults');
+            
+            let html = `
+                <div class="alert alert-info">
+                    <strong>Comparison Results for ${comparison.months_analyzed.join(', ')}</strong>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Document Trends</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Month</th>
+                                        <th>Total Docs</th>
+                                        <th>Resumes</th>
+                                        <th>Job Descriptions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+            `;
+            
+            for (const [month, data] of Object.entries(comparison.document_trends)) {
+                html += `
+                    <tr>
+                        <td>${month}</td>
+                        <td>${data.total_documents}</td>
+                        <td>${data.resumes}</td>
+                        <td>${data.job_descriptions}</td>
+                    </tr>
+                `;
+            }
+            
+            html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Summary</h6>
+                        <div class="card">
+                            <div class="card-body">
+                                <p><strong>Trend:</strong> ${comparison.summary.trend_direction || 'N/A'}</p>
+                                <p><strong>Latest Month:</strong> ${comparison.summary.latest_month || 'N/A'}</p>
+                                <p><strong>Document Change:</strong> ${comparison.summary.document_change || 0}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            resultsDiv.innerHTML = html;
         }
         
         // Auto-refresh check every 30 seconds
