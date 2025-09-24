@@ -46,6 +46,24 @@
         .chart-container {
             height: 400px;
         }
+        
+        /* Tooltip styling */
+        .tooltip-icon {
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
+        }
+        .tooltip-icon:hover {
+            opacity: 1;
+        }
+        
+        /* Custom tooltip styling */
+        .tooltip .tooltip-inner {
+            max-width: 350px;
+            padding: 12px 15px;
+            font-size: 13px;
+            line-height: 1.4;
+            text-align: left;
+        }
     </style>
 </head>
 <body>
@@ -181,24 +199,71 @@
         {% if report.skill_gap_analysis %}
         <div class="card mb-4">
             <div class="card-header bg-danger text-white">
-                <h5><i class="fas fa-exclamation-triangle me-2"></i>Skill Gap Analysis</h5>
+                <h5>
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Skill Gap Analysis
+                    <i class="fas fa-info-circle ms-2" 
+                       data-bs-toggle="tooltip" 
+                       data-bs-placement="top"
+                       title="Supply vs Demand analysis comparing skills in resumes vs job descriptions. Helps identify market opportunities and skill shortages."
+                       style="font-size: 0.8em; cursor: help;"></i>
+                </h5>
             </div>
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-4">
-                        <h6 class="text-danger">High Demand, Low Supply</h6>
+                        <h6 class="text-danger">
+                            High Demand, Low Supply
+                            <i class="fas fa-question-circle ms-1" 
+                               data-bs-toggle="tooltip" 
+                               data-bs-placement="top"
+                               data-bs-html="true"
+                               title="<strong>🔴 Skills Shortage Alert</strong><br/>
+                                      • Skills frequently mentioned in <strong>job descriptions</strong><br/>
+                                      • But <strong>missing or rare</strong> in candidate resumes<br/>
+                                      • High-value skills for career development<br/>
+                                      • Premium compensation opportunities<br/>
+                                      • Focus areas for upskilling"
+                               style="font-size: 0.7em; cursor: help;"></i>
+                        </h6>
                         {% for skill in report.skill_gap_analysis.high_demand_low_supply[:5] %}
                         <span class="badge bg-danger me-1 mb-1">{{ skill }}</span>
                         {% endfor %}
                     </div>
                     <div class="col-md-4">
-                        <h6 class="text-warning">Oversupplied Skills</h6>
+                        <h6 class="text-warning">
+                            Oversupplied Skills
+                            <i class="fas fa-question-circle ms-1" 
+                               data-bs-toggle="tooltip" 
+                               data-bs-placement="top"
+                               data-bs-html="true"
+                               title="<strong>⚠️ Market Saturation</strong><br/>
+                                      • Skills frequently found in <strong>resumes</strong><br/>
+                                      • But <strong>rarely requested</strong> in job descriptions<br/>
+                                      • Lower market value skills<br/>
+                                      • Common/commodity technologies<br/>
+                                      • High competition among candidates"
+                               style="font-size: 0.7em; cursor: help;"></i>
+                        </h6>
                         {% for skill in report.skill_gap_analysis.oversupplied_skills[:5] %}
                         <span class="badge bg-warning text-dark me-1 mb-1">{{ skill }}</span>
                         {% endfor %}
                     </div>
                     <div class="col-md-4">
-                        <h6 class="text-success">Balanced Skills</h6>
+                        <h6 class="text-success">
+                            Balanced Skills
+                            <i class="fas fa-question-circle ms-1" 
+                               data-bs-toggle="tooltip" 
+                               data-bs-placement="top"
+                               data-bs-html="true"
+                               title="<strong>✅ Healthy Market Balance</strong><br/>
+                                      • Skills found in <strong>both</strong> resumes and job descriptions<br/>
+                                      • Supply and demand are well-matched<br/>
+                                      • Standard industry requirements<br/>
+                                      • Foundation skills for the role<br/>
+                                      • Good hiring prospects for both sides"
+                               style="font-size: 0.7em; cursor: help;"></i>
+                        </h6>
                         {% for skill in report.skill_gap_analysis.balanced_skills[:5] %}
                         <span class="badge bg-success me-1 mb-1">{{ skill }}</span>
                         {% endfor %}
@@ -633,6 +698,17 @@
             
             resultsDiv.innerHTML = html;
         }
+        
+        // Initialize Bootstrap tooltips
+        document.addEventListener('DOMContentLoaded', function () {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl, {
+                    html: true,
+                    delay: { show: 200, hide: 100 }
+                });
+            });
+        });
         
         // Auto-refresh check every 30 seconds
         setInterval(async () => {
