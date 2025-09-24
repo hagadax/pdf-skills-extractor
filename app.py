@@ -207,15 +207,28 @@ def sync_ai_extractor_with_processed_documents():
     """Sync AI extractor counters with data from processed documents."""
     try:
         print("Syncing AI extractor with processed documents...")
+        
+        # Only clear and rebuild if we have no AI data or if explicitly requested
+        needs_rebuild = (
+            len(ai_extractor.ai_skill_counter) == 0 or 
+            len(ai_extractor.ai_processed_documents) == 0
+        )
+        
+        if not needs_rebuild:
+            print("AI extractor already has data, skipping sync to preserve existing state")
+            return True
+            
         ai_extractor.ai_skill_counter.clear()
         ai_extractor.ai_processed_documents.clear()
         ai_extractor.ai_skill_documents.clear()
         ai_extractor.ai_monthly_skill_data.clear()
         
         # Rebuild AI stats from processed documents
+        rebuilt_count = 0
         for filename, doc_data in processed_documents.items():
             ai_skills = doc_data.get('ai_skills_found', [])
             if ai_skills:
+                rebuilt_count += 1
                 # Update AI skill counter
                 for skill in ai_skills:
                     ai_extractor.ai_skill_counter[skill] += 1
@@ -236,11 +249,65 @@ def sync_ai_extractor_with_processed_documents():
                     for skill in ai_skills:
                         ai_extractor.ai_monthly_skill_data[skill][month_key] += 1
         
-        print(f"AI extractor sync complete: {len(ai_extractor.ai_skill_counter)} skills, {len(ai_extractor.ai_processed_documents)} documents")
+        print(f"AI extractor sync complete: {len(ai_extractor.ai_skill_counter)} skills, {len(ai_extractor.ai_processed_documents)} documents from {rebuilt_count} files with AI data")
+        
+        # Save the rebuilt AI stats to ensure persistence
+        if len(ai_extractor.ai_skill_counter) > 0:
+            save_ai_stats_to_blob()
+            
         return True
         
     except Exception as e:
         print(f"Error syncing AI extractor: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+def force_sync_ai_extractor_with_processed_documents():
+    """Force sync AI extractor counters with data from processed documents."""
+    try:
+        print("Force syncing AI extractor with processed documents...")
+        ai_extractor.ai_skill_counter.clear()
+        ai_extractor.ai_processed_documents.clear()
+        ai_extractor.ai_skill_documents.clear()
+        ai_extractor.ai_monthly_skill_data.clear()
+        
+        # Rebuild AI stats from processed documents
+        rebuilt_count = 0
+        for filename, doc_data in processed_documents.items():
+            ai_skills = doc_data.get('ai_skills_found', [])
+            if ai_skills:
+                rebuilt_count += 1
+                # Update AI skill counter
+                for skill in ai_skills:
+                    ai_extractor.ai_skill_counter[skill] += 1
+                    ai_extractor.ai_skill_documents[skill].append(filename)
+                
+                # Update processed documents
+                ai_extractor.ai_processed_documents[filename] = {
+                    'skills': ai_skills,
+                    'processed_at': doc_data.get('upload_date', datetime.now().isoformat()),
+                    'skill_count': len(ai_skills),
+                    'file_type': doc_data.get('file_type', 'unknown')
+                }
+                
+                # Update monthly data 
+                file_date = doc_data.get('file_date') or doc_data.get('upload_date', '').split(' ')[0]
+                if file_date:
+                    month_key = file_date[:7]  # YYYY-MM format
+                    for skill in ai_skills:
+                        ai_extractor.ai_monthly_skill_data[skill][month_key] += 1
+        
+        print(f"Force AI extractor sync complete: {len(ai_extractor.ai_skill_counter)} skills, {len(ai_extractor.ai_processed_documents)} documents from {rebuilt_count} files with AI data")
+        
+        # Save the rebuilt AI stats to ensure persistence
+        if len(ai_extractor.ai_skill_counter) > 0:
+            save_ai_stats_to_blob()
+            
+        return True
+        
+    except Exception as e:
+        print(f"Error force syncing AI extractor: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -676,6 +743,25 @@ def upload_file():
                     doc_type = "resume" if any(term in filename.lower() for term in ["cv", "resume"]) else "job_description"
                     ai_skills, ai_metadata = ai_extractor.extract_skills_from_text(text, doc_type)
                     print(f"AI extracted {len(ai_skills)} skills: {ai_skills}")
+                    
+                    # Update AI extractor's internal state immediately
+                    if ai_skills:
+                        for skill in ai_skills:
+                            ai_extractor.ai_skill_counter[skill] += 1
+                            ai_extractor.ai_skill_documents[skill].append(filename)
+                            # Update monthly data 
+                            date_for_tracking = file_date if file_date else upload_date.split(' ')[0]
+                            month_key = date_for_tracking[:7]  # Get YYYY-MM format
+                            ai_extractor.ai_monthly_skill_data[skill][month_key] += 1
+                        
+                        # Update AI processed documents
+                        ai_extractor.ai_processed_documents[filename] = {
+                            'skills': ai_skills,
+                            'processed_at': upload_date,
+                            'skill_count': len(ai_skills),
+                            'file_type': file_type
+                        }
+                        
                 except Exception as e:
                     print(f"AI extraction failed: {e}")
                     ai_metadata = {'error': str(e)}
@@ -977,6 +1063,26 @@ def about_page():
                          total_skill_occurrences=total_skill_occurrences,
                          total_categories=total_categories,
                          page_name='about')
+
+@app.route('/debug/sync-ai', methods=['GET'])
+def debug_sync_ai():
+    """Debug route to force sync AI extractor with processed documents."""
+    try:
+        print("Debug: Force syncing AI extractor...")
+        success = force_sync_ai_extractor_with_processed_documents()
+        
+        stats = {
+            'sync_success': success,
+            'ai_skills_count': len(ai_extractor.ai_skill_counter),
+            'ai_documents_count': len(ai_extractor.ai_processed_documents),
+            'processed_docs_with_ai': len([d for d in processed_documents.values() if d.get('ai_skills_found')]),
+            'top_ai_skills': ai_extractor.ai_skill_counter.most_common(10) if ai_extractor.ai_skill_counter else []
+        }
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # Azure Blob Storage helper functions
 # Stats persistence functions
