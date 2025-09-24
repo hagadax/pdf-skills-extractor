@@ -203,6 +203,48 @@ def load_stats_from_blob():
         traceback.print_exc()
         return False
 
+def sync_ai_extractor_with_processed_documents():
+    """Sync AI extractor counters with data from processed documents."""
+    try:
+        print("Syncing AI extractor with processed documents...")
+        ai_extractor.ai_skill_counter.clear()
+        ai_extractor.ai_processed_documents.clear()
+        ai_extractor.ai_skill_documents.clear()
+        ai_extractor.ai_monthly_skill_data.clear()
+        
+        # Rebuild AI stats from processed documents
+        for filename, doc_data in processed_documents.items():
+            ai_skills = doc_data.get('ai_skills_found', [])
+            if ai_skills:
+                # Update AI skill counter
+                for skill in ai_skills:
+                    ai_extractor.ai_skill_counter[skill] += 1
+                    ai_extractor.ai_skill_documents[skill].append(filename)
+                
+                # Update processed documents
+                ai_extractor.ai_processed_documents[filename] = {
+                    'skills': ai_skills,
+                    'processed_at': doc_data.get('upload_date', datetime.now().isoformat()),
+                    'skill_count': len(ai_skills),
+                    'file_type': doc_data.get('file_type', 'unknown')
+                }
+                
+                # Update monthly data 
+                file_date = doc_data.get('file_date') or doc_data.get('upload_date', '').split(' ')[0]
+                if file_date:
+                    month_key = file_date[:7]  # YYYY-MM format
+                    for skill in ai_skills:
+                        ai_extractor.ai_monthly_skill_data[skill][month_key] += 1
+        
+        print(f"AI extractor sync complete: {len(ai_extractor.ai_skill_counter)} skills, {len(ai_extractor.ai_processed_documents)} documents")
+        return True
+        
+    except Exception as e:
+        print(f"Error syncing AI extractor: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def load_ai_stats_from_blob():
     """Load AI extraction statistics from Azure Blob Storage."""
     try:
@@ -245,9 +287,11 @@ try:
     stats_loaded = load_stats_from_blob()
     if stats_loaded:
         print("Application stats loaded successfully on startup")
-        # Also try to explicitly load AI stats if main stats loading didn't include them
+        # Sync AI extractor with processed documents data
+        sync_ai_extractor_with_processed_documents()
+        # Also try to load dedicated AI stats to fill any gaps
         if len(ai_extractor.ai_skill_counter) == 0:
-            print("AI stats appear empty, attempting explicit AI stats load...")
+            print("AI stats still empty after sync, attempting explicit AI stats load...")
             load_ai_stats_from_blob()
     else:
         print("Failed to load main stats, attempting AI stats load only...")
@@ -1027,24 +1071,38 @@ def get_file_content(filename, is_blob=True):
 def reload_ai_stats():
     """Manually reload AI stats from blob storage for debugging."""
     try:
-        success = load_ai_stats_from_blob()
-        if success:
+        # First try to sync from processed documents
+        sync_success = sync_ai_extractor_with_processed_documents()
+        
+        # Then try to load from dedicated AI blob if needed
+        blob_success = False
+        if len(ai_extractor.ai_skill_counter) == 0:
+            blob_success = load_ai_stats_from_blob()
+        
+        total_skills = len(ai_extractor.ai_skill_counter)
+        total_docs = len(ai_extractor.ai_processed_documents)
+        
+        if sync_success or blob_success or total_skills > 0:
             return jsonify({
                 'success': True,
-                'message': 'AI stats reloaded successfully',
+                'message': f'AI stats reloaded successfully (sync: {sync_success}, blob: {blob_success})',
                 'ai_stats': {
-                    'total_documents': len(ai_extractor.ai_processed_documents),
-                    'total_skills': len(ai_extractor.ai_skill_counter),
-                    'top_skills': ai_extractor.ai_skill_counter.most_common(10)
+                    'total_documents': total_docs,
+                    'total_skills': total_skills,
+                    'top_skills': ai_extractor.ai_skill_counter.most_common(10),
+                    'sync_from_docs': sync_success,
+                    'loaded_from_blob': blob_success
                 }
             })
         else:
             return jsonify({
                 'success': False,
-                'message': 'Failed to reload AI stats',
+                'message': 'Failed to reload AI stats from both sync and blob',
                 'ai_stats': {
-                    'total_documents': len(ai_extractor.ai_processed_documents),
-                    'total_skills': len(ai_extractor.ai_skill_counter)
+                    'total_documents': total_docs,
+                    'total_skills': total_skills,
+                    'sync_from_docs': sync_success,
+                    'loaded_from_blob': blob_success
                 }
             })
     except Exception as e:
