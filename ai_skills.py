@@ -129,28 +129,42 @@ class AISkillExtractor:
             return [], {}
     
     def _create_skill_extraction_prompt(self, text: str, document_type: str) -> str:
-        """Create a well-structured prompt for skill extraction."""
+        """Create a well-structured prompt for skill extraction with multilingual support."""
         
         prompt_templates = {
             "resume": """
-Analyze this resume and extract ALL technical and professional skills mentioned. 
+Analyze this resume/CV and extract ALL technical and professional skills mentioned. 
+The text may be in Norwegian, English, or a combination of both languages.
 Include programming languages, frameworks, tools, methodologies, certifications, and soft skills.
 
-Resume text:
+Important: This text may contain PDF extraction artifacts and corrupted characters - focus on extracting meaningful skills despite text corruption.
+
+Resume/CV text:
 {text}
 
 Return a JSON array of skills in this format:
 ["Python", "React", "Docker", "Agile", "Communication", ...]
 
 Rules:
+- Handle both Norwegian and English text seamlessly
 - Include both technical and soft skills
-- Standardize skill names (e.g., "JavaScript" not "JS")
-- Don't include company names or job titles
-- Focus on transferable skills
+- Standardize skill names in English (e.g., "JavaScript" not "JS", "Kommunikasjon" -> "Communication")
+- Ignore PDF extraction artifacts and corrupted text
+- Don't include company names, job titles, or locations
+- Focus on transferable skills and competencies
+- Interpret Norwegian skill terms and translate to English equivalents:
+  * "samarbeid" -> "Team Collaboration"  
+  * "problemløsning" -> "Problem Solving"
+  * "lederskap" -> "Leadership"
+  * "kommunikasjon" -> "Communication"
+  * "utvikler/developer" -> Backend/Frontend Development (contextually)
 """,
             "job_description": """
 Analyze this job description and extract ALL required and preferred skills.
+The text may be in Norwegian, English, or a combination of both languages.
 Include technical skills, tools, frameworks, methodologies, and soft skills.
+
+Important: This text may contain PDF extraction artifacts and corrupted characters - focus on extracting meaningful skills despite text corruption.
 
 Job description:
 {text}
@@ -159,13 +173,20 @@ Return a JSON array of skills in this format:
 ["Java", "Spring Boot", "Kubernetes", "Leadership", "Problem Solving", ...]
 
 Rules:
-- Include both technical and soft skills
-- Standardize skill names
-- Include both required and preferred skills
-- Don't include company-specific terms
+- Handle both Norwegian and English text seamlessly
+- Include both technical and soft skills (both required and preferred)
+- Standardize skill names in English
+- Ignore PDF extraction artifacts and corrupted text
+- Don't include company-specific terms, locations, or salary information
+- Interpret Norwegian requirement terms and translate to English equivalents:
+  * "erfaring med" -> experience requirement (extract the technology)
+  * "kjennskap til" -> knowledge requirement (extract the technology)
+  * "gode ferdigheter i" -> proficiency requirement (extract the skill)
+  * Common Norwegian tech terms: "utvikling" (development), "rammeverk" (framework), etc.
 """,
             "default": """
 Analyze this text and extract professional skills, technologies, and competencies mentioned.
+The text may be in Norwegian, English, or mixed languages, and may contain PDF extraction artifacts.
 
 Text:
 {text}
@@ -174,9 +195,11 @@ Return a JSON array of skills in this format:
 ["Skill1", "Skill2", "Skill3", ...]
 
 Rules:
+- Handle multilingual content (Norwegian/English)
 - Focus on technical and professional skills
-- Standardize skill names
-- Don't include irrelevant terms
+- Standardize skill names in English
+- Ignore corrupted text and PDF artifacts
+- Don't include irrelevant terms or locations
 """
         }
         
@@ -191,7 +214,7 @@ Rules:
                 response = self.client.chat.completions.create(
                     model=self.model_name,
                     messages=[
-                        {"role": "system", "content": "You are an expert at extracting professional skills from text. Always return valid JSON arrays."},
+                        {"role": "system", "content": "You are an expert at extracting professional skills from multilingual text (English/Norwegian). You can handle PDF extraction artifacts and corrupted text. Always return valid JSON arrays with standardized English skill names."},
                         {"role": "user", "content": prompt}
                     ],
                     max_tokens=1000,
