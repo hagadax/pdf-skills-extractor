@@ -980,6 +980,22 @@ def ai_skills_page():
     all_ai_skills = ai_extractor.ai_skill_counter.most_common()
     return render_template('ai_skills.html', ai_skills=all_ai_skills, page_name='ai-skills')
 
+@app.route('/skill-details')
+def skill_details():
+    """Page showing skills with document references."""
+    # Create a comprehensive view of skills with their documents
+    skills_with_docs = []
+    
+    for skill, count in skill_counter.most_common():
+        documents = skill_documents.get(skill, [])
+        skills_with_docs.append({
+            'skill': skill,
+            'count': count,
+            'documents': documents
+        })
+    
+    return render_template('skill_details.html', skills_data=skills_with_docs, page_name='skill-details')
+
 @app.route('/comparison')
 def comparison_page():
     """Page comparing pattern matching vs AI extraction results."""
@@ -1016,27 +1032,6 @@ def comparison_page():
                          unique_pattern_skills=unique_pattern_skills,
                          unique_ai_skills=unique_ai_skills,
                          page_name='comparison')
-
-@app.route('/skill-details')
-def skill_details():
-    """Page showing skills with document references."""
-    # Create a comprehensive view of skills with their documents
-    skills_with_docs = []
-    
-    for skill, count in skill_counter.most_common():
-        documents = skill_documents.get(skill, [])
-        skills_with_docs.append({
-            'skill': skill,
-            'count': count,
-            'documents': documents
-        })
-    
-    return render_template('skill_details.html', skills_data=skills_with_docs, page_name='skill-details')
-
-@app.route('/documents')
-def documents_page():
-    """Page showing all processed documents."""
-    return render_template('documents.html', documents=processed_documents, page_name='documents')
 
 @app.route('/about')
 def about_page():
