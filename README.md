@@ -48,7 +48,7 @@ A Flask web application that extracts technology skills from PDF documents and t
 - `POST /upload` - Upload PDF file for skill extraction
 - `GET /skills` - View all extracted skills
 - `GET /ai-skills` - View AI-extracted skills
-- `GET /skill-details` - View skills with document references and dates
+- `GET /documents` - View all processed documents with metadata
 - `GET /comparison` - Compare pattern matching vs AI extraction results
 - `GET /monthly-dashboard` - Monthly analysis and reports
 - `GET /about` - About page with application information and purpose
@@ -79,7 +79,7 @@ get-skills/
 │   ├── index.html     # Main page template
 │   ├── skills.html    # Skills listing page
 │   ├── ai_skills.html # AI skills page
-│   ├── skill_details.html # Skills with document references
+│   ├── documents.html # Document library page
 │   ├── comparison.html # Comparison page template
 │   ├── monthly_dashboard.html # Monthly analysis template
 │   └── about.html     # About page with app information
