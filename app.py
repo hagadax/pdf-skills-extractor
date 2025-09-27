@@ -698,16 +698,33 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    """Handle PDF and Excel file upload and skill extraction."""
-    if 'file' not in request.files:
-        return jsonify({'success': False, 'message': 'No file selected'})
+    """Handle multiple PDF and Excel file upload and skill extraction."""
+    # Check if files are in request
+    if 'files' not in request.files:
+        return jsonify({'success': False, 'message': 'No files selected'})
     
-    file = request.files['file']
+    files = request.files.getlist('files')
     
-    if file.filename == '':
-        return jsonify({'success': False, 'message': 'No file selected'})
+    if not files or all(file.filename == '' for file in files):
+        return jsonify({'success': False, 'message': 'No files selected'})
     
-    if file and allowed_file(file.filename):
+    processed_files = []
+    failed_files = []
+    total_skills = set()
+    total_ai_skills = set()
+    
+    # Process each file
+    for file in files:
+        if not file or file.filename == '':
+            continue
+            
+        if not allowed_file(file.filename):
+            failed_files.append({
+                'filename': file.filename,
+                'error': 'Unsupported file type. Please upload PDF or Excel files.'
+            })
+            continue
+            
         filename = secure_filename(file.filename)
         
         try:
@@ -729,132 +746,159 @@ def upload_file():
                 text = extract_text_from_excel(file_content, filename)
                 file_date = get_excel_creation_date(file_content, filename)
             else:
-                return jsonify({'success': False, 'message': 'Unsupported file type'})
+                failed_files.append({
+                    'filename': filename,
+                    'error': 'Unsupported file type'
+                })
+                continue
             
-            if text:
-                # Extract skills from text using pattern matching (existing method)
-                found_skills = extract_skills(text)
+            if not text:
+                failed_files.append({
+                    'filename': filename,
+                    'error': f'Could not extract text from {file_type.upper()} file'
+                })
+                continue
+            
+            # Extract skills from text using pattern matching
+            found_skills = extract_skills(text)
+            
+            # Extract skills using AI
+            ai_skills = []
+            ai_metadata = {}
+            try:
+                # Determine document type from filename
+                doc_type = "resume" if any(term in filename.lower() for term in ["cv", "resume"]) else "job_description"
+                ai_skills, ai_metadata = ai_extractor.extract_skills_from_text(text, doc_type)
+                print(f"AI extracted {len(ai_skills)} skills from {filename}: {ai_skills}")
                 
-                # Extract skills using AI (new method)
-                ai_skills = []
-                ai_metadata = {}
-                try:
-                    # Determine document type from filename
-                    doc_type = "resume" if any(term in filename.lower() for term in ["cv", "resume"]) else "job_description"
-                    ai_skills, ai_metadata = ai_extractor.extract_skills_from_text(text, doc_type)
-                    print(f"AI extracted {len(ai_skills)} skills: {ai_skills}")
+                # Update AI extractor's internal state immediately
+                if ai_skills:
+                    for skill in ai_skills:
+                        ai_extractor.ai_skill_counter[skill] += 1
+                        ai_extractor.ai_skill_documents[skill].append(filename)
+                        # Update monthly data 
+                        date_for_tracking = file_date if file_date else upload_date.split(' ')[0]
+                        month_key = date_for_tracking[:7]  # Get YYYY-MM format
+                        ai_extractor.ai_monthly_skill_data[skill][month_key] += 1
                     
-                    # Update AI extractor's internal state immediately
-                    if ai_skills:
-                        for skill in ai_skills:
-                            ai_extractor.ai_skill_counter[skill] += 1
-                            ai_extractor.ai_skill_documents[skill].append(filename)
-                            # Update monthly data 
-                            date_for_tracking = file_date if file_date else upload_date.split(' ')[0]
-                            month_key = date_for_tracking[:7]  # Get YYYY-MM format
-                            ai_extractor.ai_monthly_skill_data[skill][month_key] += 1
-                        
-                        # Update AI processed documents
-                        ai_extractor.ai_processed_documents[filename] = {
-                            'skills': ai_skills,
-                            'processed_at': upload_date,
-                            'skill_count': len(ai_skills),
-                            'file_type': file_type
-                        }
-                        
-                except Exception as e:
-                    print(f"AI extraction failed: {e}")
-                    ai_metadata = {'error': str(e)}
-                
-                # Get month key for tracking (use file date if available, otherwise upload date)
-                date_for_tracking = file_date if file_date else upload_date.split(' ')[0]
-                month_key = date_for_tracking[:7]  # Get YYYY-MM format
-                
-                # Update global skill counter (pattern matching)
-                for skill in found_skills:
-                    skill_counter[skill] += 1  # +1 per document, regardless of skill frequency in text
-                    
-                    # Track monthly data
-                    monthly_skill_data[skill][month_key] += 1
-                    
-                    # Track which document contains this skill
-                    skill_documents[skill].append({
-                        'filename': filename,
-                        'upload_date': upload_date,
-                        'file_date': file_date or upload_date.split(' ')[0],  # Use upload date if no file date
+                    # Update AI processed documents
+                    ai_extractor.ai_processed_documents[filename] = {
+                        'skills': ai_skills,
+                        'processed_at': upload_date,
+                        'skill_count': len(ai_skills),
                         'file_type': file_type
-                    })
-                
-                # Track processed document
-                processed_documents[filename] = {
+                    }
+                    
+            except Exception as e:
+                print(f"AI extraction failed for {filename}: {e}")
+                ai_metadata = {'error': str(e)}
+            
+            # Get month key for tracking
+            date_for_tracking = file_date if file_date else upload_date.split(' ')[0]
+            month_key = date_for_tracking[:7]  # Get YYYY-MM format
+            
+            # Update global skill counter (pattern matching)
+            for skill in found_skills:
+                skill_counter[skill] += 1
+                # Track monthly data
+                monthly_skill_data[skill][month_key] += 1
+                # Track which document contains this skill
+                skill_documents[skill].append({
+                    'filename': filename,
                     'upload_date': upload_date,
                     'file_date': file_date or upload_date.split(' ')[0],
-                    'skills_found': found_skills,
-                    'ai_skills_found': ai_skills,
-                    'ai_metadata': ai_metadata,
-                    'storage_type': 'blob' if is_blob else 'local',
                     'file_type': file_type
-                }
-                
-                # Save stats to blob storage after processing
-                save_stats_to_blob()
-                
-                # Also save a backup with timestamp for data recovery
-                try:
-                    backup_blob_name = f'backups/stats_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
-                    blob_service_client = get_blob_service_client()
-                    if blob_service_client:
-                        backup_stats = {
-                            'skill_counter': dict(skill_counter),
-                            'processed_documents': processed_documents,
-                            'backup_timestamp': datetime.now().isoformat()
-                        }
-                        backup_blob_client = blob_service_client.get_blob_client(
-                            container=STATS_CONTAINER_NAME,
-                            blob=backup_blob_name
-                        )
-                        backup_blob_client.upload_blob(
-                            json.dumps(backup_stats, indent=2).encode('utf-8'), 
-                            overwrite=True
-                        )
-                        print(f"Backup created: {backup_blob_name}")
-                except Exception as backup_error:
-                    print(f"Warning: Failed to create backup: {backup_error}")
-                
-                storage_msg = 'Azure Blob Storage' if is_blob else 'local storage'
-                file_type_msg = 'PDF' if file_type == 'pdf' else 'Excel'
-                
-                # Create response message
-                response_message = f'Successfully processed {file_type_msg} file {filename} (saved to {storage_msg}).\n'
-                response_message += f'Pattern Matching found {len(found_skills)} skills: {", ".join(found_skills)}'
-                
-                if ai_skills:
-                    response_message += f'\nAI Extraction found {len(ai_skills)} skills: {", ".join(ai_skills)}'
-                elif 'error' in ai_metadata:
-                    response_message += f'\nAI Extraction failed: {ai_metadata["error"]}'
-                else:
-                    response_message += f'\nAI Extraction: No OpenAI API key configured'
-                
-                return jsonify({
-                    'success': True, 
-                    'message': response_message,
-                    'skills': found_skills,
-                    'ai_skills': ai_skills,
-                    'filename': filename,
-                    'file_type': file_type,
-                    'extraction_methods': {
-                        'pattern_matching': len(found_skills),
-                        'ai_extraction': len(ai_skills)
-                    }
                 })
-            else:
-                file_type_msg = 'PDF' if file_type == 'pdf' else 'Excel'
-                return jsonify({'success': False, 'message': f'Could not extract text from {file_type_msg} file {filename}'})
-                
+            
+            # Track processed document
+            processed_documents[filename] = {
+                'upload_date': upload_date,
+                'file_date': file_date or upload_date.split(' ')[0],
+                'skills_found': found_skills,
+                'ai_skills_found': ai_skills,
+                'ai_metadata': ai_metadata,
+                'storage_type': 'blob' if is_blob else 'local',
+                'file_type': file_type
+            }
+            
+            # Add to processed files list
+            processed_files.append({
+                'filename': filename,
+                'file_type': file_type,
+                'pattern_skills': len(found_skills),
+                'ai_skills': len(ai_skills),
+                'storage': 'Azure Blob Storage' if is_blob else 'local storage'
+            })
+            
+            # Add skills to totals
+            total_skills.update(found_skills)
+            total_ai_skills.update(ai_skills)
+            
         except Exception as e:
-            return jsonify({'success': False, 'message': f'Error processing file: {str(e)}'})
-    else:
-        return jsonify({'success': False, 'message': 'Please upload a PDF or Excel file (.pdf, .xlsx, .xls)'})
+            failed_files.append({
+                'filename': filename,
+                'error': f'Error processing file: {str(e)}'
+            })
+    
+    # Save stats to blob storage after processing all files
+    if processed_files:
+        save_stats_to_blob()
+        
+        # Create backup
+        try:
+            backup_blob_name = f'backups/stats_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+            blob_service_client = get_blob_service_client()
+            if blob_service_client:
+                backup_stats = {
+                    'skill_counter': dict(skill_counter),
+                    'processed_documents': processed_documents,
+                    'backup_timestamp': datetime.now().isoformat()
+                }
+                backup_blob_client = blob_service_client.get_blob_client(
+                    container=STATS_CONTAINER_NAME,
+                    blob=backup_blob_name
+                )
+                backup_blob_client.upload_blob(
+                    json.dumps(backup_stats, indent=2).encode('utf-8'), 
+                    overwrite=True
+                )
+                print(f"Backup created: {backup_blob_name}")
+        except Exception as backup_error:
+            print(f"Warning: Failed to create backup: {backup_error}")
+    
+    # Create response message
+    if not processed_files and not failed_files:
+        return jsonify({'success': False, 'message': 'No valid files to process'})
+    
+    # Build response message
+    message_parts = []
+    
+    if processed_files:
+        message_parts.append(f"Successfully processed {len(processed_files)} file(s):")
+        for file_info in processed_files:
+            message_parts.append(f"• {file_info['filename']}: {file_info['pattern_skills']} pattern skills, {file_info['ai_skills']} AI skills")
+        
+        message_parts.append(f"\nTotal unique skills found:")
+        message_parts.append(f"• Pattern Matching: {len(total_skills)} skills")
+        message_parts.append(f"• AI Extraction: {len(total_ai_skills)} skills")
+    
+    if failed_files:
+        message_parts.append(f"\nFailed to process {len(failed_files)} file(s):")
+        for file_info in failed_files:
+            message_parts.append(f"• {file_info['filename']}: {file_info['error']}")
+    
+    return jsonify({
+        'success': len(processed_files) > 0,
+        'message': '\n'.join(message_parts),
+        'summary': {
+            'processed_files': len(processed_files),
+            'failed_files': len(failed_files),
+            'total_pattern_skills': len(total_skills),
+            'total_ai_skills': len(total_ai_skills)
+        },
+        'processed_files': processed_files,
+        'failed_files': failed_files
+    })
 
 @app.route('/api/skills')
 def api_skills():

@@ -36,7 +36,7 @@ instance/
 uploads/
 
 # IDE
-.vscode/
+
 .idea/
 *.swp
 *.swo
